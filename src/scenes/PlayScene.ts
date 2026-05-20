@@ -31,9 +31,6 @@ export class PlayScene extends Container {
     placeholder.x = 0
     placeholder.y = 0
     this.addChild(placeholder)
-
-    this.eventMode = 'static'
-    this.cursor = 'default'
   }
 
   /**
