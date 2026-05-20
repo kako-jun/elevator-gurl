@@ -10,8 +10,16 @@ import type { KeyboardCommand, KeyboardManager } from '../input/KeyboardManager'
 import { UI_PRIMARY, UI_SECONDARY, UI_TEXT_PRIMARY } from '../constants/colors'
 import type { SoundManager } from '../audio/SoundManager'
 
+/**
+ * リザルトの種別。
+ * - `gameover`: 失敗終了 (デフォルト)
+ * - `clear`: クリア終了
+ *
+ * 種別ごとに見出しを変える。
+ */
+export type ResultKind = 'gameover' | 'clear'
+
 export interface ResultSceneOptions {
-  score?: number
   onRestart: () => void
   onTitle: () => void
   /**
@@ -19,6 +27,11 @@ export interface ResultSceneOptions {
    * ボタン操作時に `ui-select` を鳴らす。
    */
   soundManager?: SoundManager | null
+}
+
+const HEADLINE_TEXT: Record<ResultKind, string> = {
+  gameover: 'お疲れさま',
+  clear: 'クリア！',
 }
 
 interface ButtonAction {
@@ -43,15 +56,18 @@ export class ResultScene extends Container {
   private readonly opts: ResultSceneOptions
   private readonly buttons: ButtonAction[] = []
   private readonly soundManager: SoundManager | null
+  private readonly headline: Text
+  private readonly scoreText: Text
+  private currentKind: ResultKind = 'gameover'
 
   constructor(opts: ResultSceneOptions) {
     super()
     this.opts = opts
     this.soundManager = opts.soundManager ?? null
 
-    // 見出し。
-    const headline = new Text({
-      text: 'お疲れさま',
+    // 見出し (種別に応じて setResult で差し替える)。
+    this.headline = new Text({
+      text: HEADLINE_TEXT[this.currentKind],
       style: {
         fontFamily: 'Inter, system-ui, sans-serif',
         fontSize: 48,
@@ -60,29 +76,28 @@ export class ResultScene extends Container {
         align: 'center',
       },
     })
-    headline.anchor.set(0.5)
-    headline.x = 0
-    headline.y = HEADLINE_OFFSET_Y
-    this.addChild(headline)
+    this.headline.anchor.set(0.5)
+    this.headline.x = 0
+    this.headline.y = HEADLINE_OFFSET_Y
+    this.addChild(this.headline)
 
-    // スコア (任意)。
-    if (opts.score !== undefined) {
-      const score = new Text({
-        text: `SCORE: ${opts.score}`,
-        style: {
-          fontFamily: 'Inter, system-ui, sans-serif',
-          fontSize: 24,
-          fontWeight: '700',
-          fill: UI_TEXT_PRIMARY,
-          align: 'center',
-        },
-      })
-      score.anchor.set(0.5)
-      score.alpha = 0.85
-      score.x = 0
-      score.y = SCORE_OFFSET_Y
-      this.addChild(score)
-    }
+    // スコア (任意、setResult で更新)。
+    this.scoreText = new Text({
+      text: '',
+      style: {
+        fontFamily: 'Inter, system-ui, sans-serif',
+        fontSize: 24,
+        fontWeight: '700',
+        fill: UI_TEXT_PRIMARY,
+        align: 'center',
+      },
+    })
+    this.scoreText.anchor.set(0.5)
+    this.scoreText.alpha = 0.85
+    this.scoreText.x = 0
+    this.scoreText.y = SCORE_OFFSET_Y
+    this.scoreText.visible = false
+    this.addChild(this.scoreText)
 
     // ボタン定義。
     const defs: { key: 'restart' | 'title'; label: string }[] = [
@@ -93,9 +108,24 @@ export class ResultScene extends Container {
       const cy = BUTTONS_START_Y + i * (BUTTON_HEIGHT + BUTTON_GAP)
       this.addButton(defs[i].key, defs[i].label, 0, cy)
     }
+  }
 
-    this.eventMode = 'static'
-    this.cursor = 'default'
+  /**
+   * リザルト内容を更新する。
+   *
+   * シーンを破棄せず常駐させたまま見出しとスコアだけ差し替える。
+   * `score` を渡さない (または undefined) なら SCORE 行は非表示にする。
+   */
+  setResult(opts: { kind: ResultKind; score?: number }): void {
+    this.currentKind = opts.kind
+    this.headline.text = HEADLINE_TEXT[opts.kind]
+    if (opts.score !== undefined) {
+      this.scoreText.text = `SCORE: ${opts.score}`
+      this.scoreText.visible = true
+    } else {
+      this.scoreText.text = ''
+      this.scoreText.visible = false
+    }
   }
 
   /**

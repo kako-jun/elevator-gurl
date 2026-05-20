@@ -24,11 +24,14 @@ import './index.css'
 const VIEW_W = 360
 const VIEW_H = 640
 
-/** 誌面 (world) 上の各シーンの絶対座標。 */
+/**
+ * 誌面 (world) 上の各シーンの絶対座標。
+ * 9:16 縦比率に合わせ、シーンも縦に積む (title → play → result を 1 画面分ずつ下へ)。
+ */
 const SCENE_TRANSFORMS = {
   title: { x: VIEW_W / 2, y: VIEW_H / 2, scale: 1 },
-  play: { x: VIEW_W / 2 + 800, y: VIEW_H / 2, scale: 1 },
-  result: { x: VIEW_W / 2 + 1600, y: VIEW_H / 2, scale: 1 },
+  play: { x: VIEW_W / 2, y: VIEW_H / 2 + VIEW_H, scale: 1 },
+  result: { x: VIEW_W / 2, y: VIEW_H / 2 + VIEW_H * 2, scale: 1 },
 } as const
 
 async function bootstrap(): Promise<void> {
@@ -96,7 +99,6 @@ async function bootstrap(): Promise<void> {
   app.stage.addChild(muteButton)
 
   let activeUnsub: (() => void) | null = null
-  let resultScene: ResultScene | null = null
 
   // --- Title ---
   const titleScene = new TitleScene(() => startPlay(), sound)
@@ -109,6 +111,21 @@ async function bootstrap(): Promise<void> {
   playScene.x = SCENE_TRANSFORMS.play.x
   playScene.y = SCENE_TRANSFORMS.play.y
   sceneManager.world.addChild(playScene)
+
+  // --- Result --- (常駐。setResult で内容だけ差し替える)
+  const resultScene = new ResultScene({
+    soundManager: sound,
+    onRestart: () => {
+      startPlay()
+    },
+    onTitle: () => {
+      setActiveScene('title')
+      void sceneManager.navigateTo('title', 800)
+    },
+  })
+  resultScene.x = SCENE_TRANSFORMS.result.x
+  resultScene.y = SCENE_TRANSFORMS.result.y
+  sceneManager.world.addChild(resultScene)
 
   // SceneManager に登録。
   sceneManager.registerScene('title', SCENE_TRANSFORMS.title)
@@ -142,7 +159,7 @@ async function bootstrap(): Promise<void> {
         })
         break
       case 'result':
-        if (resultScene) activeUnsub = resultScene.attachInputs(keyboard)
+        activeUnsub = resultScene.attachInputs(keyboard)
         break
     }
   }
@@ -152,33 +169,10 @@ async function bootstrap(): Promise<void> {
     void sceneManager.navigateTo('play', 800)
   }
 
-  // showResult はテンプレ段階では keyboard ショートカット (Issue #10 では未使用) や
-  // PlayScene 側からの呼び出し用に用意しておく。タイトル → Play 遷移後に Play から
-  // Result へ向かう導線は後続 Issue で実装する。
+  // Result への遷移は後続 Issue で実装する。常駐済の resultScene に対しては
+  // `resultScene.setResult({ kind, score })` → `setActiveScene('result')` →
+  // `sceneManager.navigateTo('result', 800)` の順で呼ぶだけで良い。
   // 現在の golden path は: Title → Play → (Esc) → Title。
-  void showResult
-  function showResult(score?: number): void {
-    if (resultScene && !resultScene.destroyed) {
-      resultScene.destroy()
-    }
-    resultScene = new ResultScene({
-      score,
-      soundManager: sound,
-      onRestart: () => {
-        startPlay()
-      },
-      onTitle: () => {
-        setActiveScene('title')
-        void sceneManager.navigateTo('title', 800)
-      },
-    })
-    resultScene.x = SCENE_TRANSFORMS.result.x
-    resultScene.y = SCENE_TRANSFORMS.result.y
-    sceneManager.world.addChild(resultScene)
-
-    setActiveScene('result')
-    void sceneManager.navigateTo('result', 800)
-  }
 }
 
 void bootstrap()
