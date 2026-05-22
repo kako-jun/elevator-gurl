@@ -80,6 +80,13 @@ const COLOR_DOOR_OPEN = 0x3a6a8a // 扉が開いているときの背景
 /** inputフェーズのタイムバー色 */
 const COLOR_TIMER_BAR = 0x44cc88
 const COLOR_TIMER_LOW = 0xcc4444
+/** 待機列テキスト色 */
+const COLOR_WAITING_TEXT = 0xddcc88
+const COLOR_WAITING_MORE = 0x888866
+/** ログテキスト色 */
+const COLOR_LOG_TEXT = 0xaaccff
+/** 乗客数インジケータ色（エレベータ箱の暗色に合わせる） */
+const COLOR_PASSENGER_COUNT = COLOR_HUD_BG
 
 export class PlayScene extends Container {
   private state: GameState
@@ -180,7 +187,11 @@ export class PlayScene extends Container {
     // 乗客数インジケータ（エレベータ箱内に重ねて表示）
     this.passengerCountText = new Text({
       text: '',
-      style: { fontFamily: 'monospace', fontSize: 9, fill: 0x111111 },
+      style: {
+        fontFamily: 'monospace',
+        fontSize: 9,
+        fill: COLOR_PASSENGER_COUNT,
+      },
     })
     this.passengerCountText.anchor.set(0.5, 0.5)
     this.addChild(this.passengerCountText)
@@ -455,22 +466,33 @@ export class PlayScene extends Container {
   private detectPhaseChange(): void {
     const phase = this.state.elevator.phase
     if (this.prevPhase === phase) return
-    if (phase !== 'door_open') return
 
-    const currentFloor = Math.round(this.state.elevator.currentFloor)
+    // door_open が終わった直後（afterDoorClose 実行済み）にログを記録する。
+    // 乗降処理は afterDoorClose 内で行われるため、door_open への遷移時ではなく
+    // door_open から次フェーズへの遷移時に prevPassengers と比較する。
+    if (this.prevPhase === 'door_open') {
+      // prevPassengers が door_open 開始時（乗降前）の乗客リスト
+      // this.state.passengers が乗降後の乗客リスト
+      // prevElevatorFloor を使うため、prevPassengers 記録時の階が必要なので
+      // prevPhase が door_open の間は currentFloor は変わらない（移動しない）
+      // → state.elevator.currentFloor は乗降後もその階なので使用可能
+      const currentFloor = Math.round(this.state.elevator.currentFloor)
 
-    // 降りた客: prevPassengers の中で targetFloor === currentFloor の人
-    const prevNames = new Set(this.prevPassengers.map(p => p.resident.name))
-    for (const p of this.prevPassengers) {
-      if (p.targetFloor === currentFloor) {
-        this.addLog(`${currentFloor}F: ${p.resident.nameZh} ↓`)
+      const prevNames = new Set(this.prevPassengers.map(p => p.resident.name))
+      const newNames = new Set(this.state.passengers.map(p => p.resident.name))
+
+      // 降りた客: prevPassengers にいて新しい passengers にいない人
+      for (const p of this.prevPassengers) {
+        if (!newNames.has(p.resident.name)) {
+          this.addLog(`${currentFloor}F: ${p.resident.nameZh} ↓`)
+        }
       }
-    }
 
-    // 乗ってきた客: 新しい passengers にいて prevPassengers にいない人
-    for (const p of this.state.passengers) {
-      if (!prevNames.has(p.resident.name) && p.pressedBy === 'auto') {
-        this.addLog(`${currentFloor}F: ${p.resident.nameZh} ↑1F`)
+      // 乗ってきた客: 新しい passengers にいて prevPassengers にいない人
+      for (const p of this.state.passengers) {
+        if (!prevNames.has(p.resident.name) && p.pressedBy === 'auto') {
+          this.addLog(`${currentFloor}F: ${p.resident.nameZh} ↑1F`)
+        }
       }
     }
   }
@@ -500,6 +522,7 @@ export class PlayScene extends Container {
     const midY = floor1Y + FLOOR_H / 2
 
     // 表示可能な行数（1行 = 約11px）
+    // 1階エリアの下半分（midY 以下）のみを使用し、ボタンや行き先表示との衝突を避ける
     const lineH = 11
     const maxVisible = Math.floor((floor1Bottom - midY) / lineH)
     const displayCount = Math.min(queue.length, MAX_WAITING, maxVisible)
@@ -513,12 +536,18 @@ export class PlayScene extends Container {
       if (!t) {
         t = new Text({
           text: '',
-          style: { fontFamily: 'monospace', fontSize: 9, fill: 0xddcc88 },
+          style: {
+            fontFamily: 'monospace',
+            fontSize: 9,
+            fill: COLOR_WAITING_TEXT,
+          },
         })
         t.anchor.set(0, 0.5)
         this.addChild(t)
         this.waitingTextPool.push(t)
       }
+      // テキストプールを通常アイテムとして再利用する際に色を確定させる
+      t.style.fill = COLOR_WAITING_TEXT
       t.text = resident.nameZh
       t.x = BTN_X
       t.y = y
@@ -534,12 +563,18 @@ export class PlayScene extends Container {
       if (!t) {
         t = new Text({
           text: '',
-          style: { fontFamily: 'monospace', fontSize: 9, fill: 0x888866 },
+          style: {
+            fontFamily: 'monospace',
+            fontSize: 9,
+            fill: COLOR_WAITING_MORE,
+          },
         })
         t.anchor.set(0, 0.5)
         this.addChild(t)
         this.waitingTextPool.push(t)
       }
+      // テキストプールを「...他N人」として再利用する際に色を確定させる
+      t.style.fill = COLOR_WAITING_MORE
       t.text = `...他${extra}人`
       t.x = BTN_X
       t.y = y
@@ -569,7 +604,7 @@ export class PlayScene extends Container {
       if (!t) {
         t = new Text({
           text: '',
-          style: { fontFamily: 'monospace', fontSize: 9, fill: 0xaaccff },
+          style: { fontFamily: 'monospace', fontSize: 9, fill: COLOR_LOG_TEXT },
         })
         t.anchor.set(0, 0.5)
         this.addChild(t)
@@ -597,6 +632,16 @@ export class PlayScene extends Container {
 
   reset(): void {
     this.state = createInitialState()
+    // テキストプールとログをリセットしてゲームオーバー後の残留表示を防ぐ
+    this.logLines.length = 0
+    for (const t of this.waitingTextPool) {
+      t.visible = false
+    }
+    for (const t of this.logTextPool) {
+      t.visible = false
+    }
+    this.prevPhase = null
+    this.prevPassengers = []
     this.refreshButtons()
   }
 
