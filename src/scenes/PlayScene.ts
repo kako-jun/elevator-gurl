@@ -511,7 +511,7 @@ export class PlayScene extends Container {
     const clamped = Math.min(this.state.mistakes, MAX_MISTAKES)
     const hearts = '♥'.repeat(MAX_MISTAKES - clamped) + '♡'.repeat(clamped)
     const remaining = Math.max(0, TUITION_GOAL - this.state.money)
-    this.hudText.text = `${todLabel} ¥${this.state.money}  残¥${remaining}  ×${this.state.mistakes}  ${hearts}`
+    this.hudText.text = `${todLabel} ¥${this.state.money}  残¥${remaining}  × ${this.state.mistakes}  ${hearts}`
 
     // 下段: フェーズ表示
     const phase = this.state.elevator.phase

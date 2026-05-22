@@ -116,6 +116,7 @@ export function boardPassengers(state: GameState): GameState {
   }))
 
   const newMoney = state.money + WAGE_PER_TRIP
+  // !state.isGameOver: 既にゲームオーバー（ミス超過）の状態でクリア扱いにしない
   const isClear = newMoney >= TUITION_GOAL && !state.isGameOver
 
   return {
