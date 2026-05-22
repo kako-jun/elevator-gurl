@@ -30,6 +30,9 @@ export const FLOOR_COUNT = 8
 /** 1階の待機客の上限 */
 export const MAX_WAITING = 10
 
+/** 住民タイプ */
+export type ResidentType = 'normal' | 'elder' | 'child'
+
 /** 住民データ */
 export interface Resident {
   /** 広東語ローマ字読み (例: "Chan Tai-Man") */
@@ -38,6 +41,8 @@ export interface Resident {
   nameZh: string
   /** 居住階 (2〜FLOOR_COUNT。1階は出発点なので居住階にしない) */
   floor: number
+  /** 住民タイプ（省略時は 'normal'） */
+  type?: ResidentType
 }
 
 /**
@@ -55,8 +60,9 @@ export interface Passenger {
    * - 'player': プレイヤーが押した（正解）
    * - 'self': 客自身が押した（プレイヤーが押せなかった → 不正解）
    * - 'auto': 上の階から乗った客（1階行き自動）
+   * - 'child': 子供の悪戯で押された（仮想乗客）
    */
-  pressedBy: 'player' | 'self' | 'auto' | null
+  pressedBy: 'player' | 'self' | 'auto' | 'child' | null
 }
 
 /** エレベータのフェーズ */
@@ -115,17 +121,17 @@ export const RESIDENTS_DB: Resident[] = [
   { name: 'Ng Yuk-Ling', nameZh: '吳玉玲', floor: 8 },
   { name: 'Cheung Ho', nameZh: '張浩', floor: 4 },
   { name: 'Chow Mei-Yee', nameZh: '周美儀', floor: 6 },
-  { name: 'Ho Kam-Fai', nameZh: '何錦輝', floor: 3 },
-  { name: 'Yip Siu-Wan', nameZh: '葉少雲', floor: 7 },
-  { name: 'Tsang Chi-Wai', nameZh: '曾志偉', floor: 2 },
+  { name: 'Ho Kam-Fai', nameZh: '何錦輝', floor: 3, type: 'elder' },
+  { name: 'Yip Siu-Wan', nameZh: '葉少雲', floor: 7, type: 'child' },
+  { name: 'Tsang Chi-Wai', nameZh: '曾志偉', floor: 2, type: 'elder' },
   { name: 'Kwok Lai-Ha', nameZh: '郭麗霞', floor: 5 },
   { name: 'Mak Tin-Yau', nameZh: '麥天佑', floor: 8 },
-  { name: 'Tang Po-Shan', nameZh: '鄧寶珊', floor: 4 },
+  { name: 'Tang Po-Shan', nameZh: '鄧寶珊', floor: 4, type: 'elder' },
   { name: 'Pang Wai-Man', nameZh: '彭偉民', floor: 6 },
   { name: 'Hui Chun-Keung', nameZh: '許振強', floor: 3 },
   { name: 'Yuen Siu-Fong', nameZh: '袁小鳳', floor: 7 },
   { name: 'Tse Kwok-Hung', nameZh: '謝國雄', floor: 2 },
   { name: 'Ma Wai-Ying', nameZh: '馬惠英', floor: 5 },
   { name: 'Fung Kin-Man', nameZh: '馮建民', floor: 4 },
-  { name: 'Sin Mei-Kwan', nameZh: '冼美君', floor: 6 },
+  { name: 'Sin Mei-Kwan', nameZh: '冼美君', floor: 6, type: 'child' },
 ]

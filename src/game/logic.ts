@@ -146,6 +146,15 @@ export function playerPressFloor(
 ): GameState {
   if (state.elevator.phase !== 'input') return state
 
+  // 悪戯ボタン（pressedBy === 'child'）がある場合はキャンセル（除去）
+  const childIdx = state.passengers.findIndex(
+    p => p.targetFloor === targetFloor && p.pressedBy === 'child'
+  )
+  if (childIdx !== -1) {
+    const passengers = state.passengers.filter((_, i) => i !== childIdx)
+    return { ...state, passengers }
+  }
+
   // その階の客でまだ誰も押していない最初の1人に割り当てる
   const idx = state.passengers.findIndex(
     p => p.targetFloor === targetFloor && p.pressedBy === null
@@ -169,18 +178,40 @@ export function finalizeInput(state: GameState): GameState {
   let mistakes = state.mistakes
   const passengers = state.passengers.map(p => {
     if (p.pressedBy === null) {
-      mistakes += 1
+      const missCount = p.resident.type === 'elder' ? 2 : 1
+      mistakes += missCount
       return { ...p, pressedBy: 'self' as const }
     }
     return p
   })
 
+  // 子供の悪戯ボタン: 50% の確率でランダムな空き階に仮想 Passenger を追加
+  const childPassenger = passengers.find(p => p.resident.type === 'child')
+  let finalPassengers = passengers
+  if (childPassenger && Math.random() < 0.5) {
+    const occupiedFloors = new Set(passengers.map(p => p.targetFloor))
+    const freeFloors: number[] = []
+    for (let f = 2; f <= FLOOR_COUNT; f++) {
+      if (!occupiedFloors.has(f)) freeFloors.push(f)
+    }
+    if (freeFloors.length > 0) {
+      const randFloor =
+        freeFloors[Math.floor(Math.random() * freeFloors.length)]
+      const trickPassenger: Passenger = {
+        resident: childPassenger.resident,
+        targetFloor: randFloor,
+        pressedBy: 'child',
+      }
+      finalPassengers = [...passengers, trickPassenger]
+    }
+  }
+
   // 止まる必要がある階を昇順に並べる
-  const nextStop = calcNextStop(1, passengers)
+  const nextStop = calcNextStop(1, finalPassengers)
 
   return {
     ...state,
-    passengers,
+    passengers: finalPassengers,
     mistakes,
     isGameOver: mistakes >= MAX_MISTAKES,
     elevator: {
