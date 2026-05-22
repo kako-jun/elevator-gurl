@@ -13,6 +13,7 @@ import {
   updateElevator,
   floorToY,
   timeOfDay,
+  tryRandomEvent,
   BOARDING_MS,
   DOOR_OPEN_MS,
   MINUTES_PER_TRIP,
@@ -624,5 +625,89 @@ describe('buildWaitingQueue / floorCount フィルタ（boardPassengers 経由�
     // deltaMS を大きくして moving_down → boarding 遷移
     const next = updateElevator(state, 5000)
     expect(next.waitingQueue.every(r => r.floor <= 8)).toBe(true)
+  })
+})
+
+describe('tryRandomEvent', () => {
+  const residents = [
+    { name: 'Chan Siu-Ming', nameZh: '陳小明', floor: 2 },
+    { name: 'Wong Wai-Keung', nameZh: '黃偉強', floor: 5 },
+  ]
+
+  it('Math.random > 0.15 のとき null を返す', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.9)
+    expect(tryRandomEvent(residents)).toBeNull()
+    vi.restoreAllMocks()
+  })
+
+  it('Math.random <= 0.15 のとき RandomEvent を返す', () => {
+    // 最初の呼び出し（確率チェック）は 0.1、以降はイベント種別・住民・テキスト選択用
+    vi.spyOn(Math, 'random').mockReturnValue(0.1)
+    const ev = tryRandomEvent(residents)
+    expect(ev).not.toBeNull()
+    expect(ev!.residentName).toBeDefined()
+    expect(ev!.text).toBeDefined()
+    vi.restoreAllMocks()
+  })
+
+  it('gift_food イベントの moneyBonus は 30', () => {
+    // random=0 → 確率OK, kind=gift_food(index 0), resident[0], text[0]
+    vi.spyOn(Math, 'random').mockReturnValue(0)
+    const ev = tryRandomEvent(residents)
+    expect(ev!.kind).toBe('gift_food')
+    expect(ev!.moneyBonus).toBe(30)
+    vi.restoreAllMocks()
+  })
+
+  it('complaint イベントの moneyBonus は 0', () => {
+    // random=0 で確率OK、次に kind=complaint になる値（index 3 / 4 = 0.75）
+    vi.spyOn(Math, 'random')
+      .mockReturnValueOnce(0.1) // 確率チェック (<=0.15 → イベント発生)
+      .mockReturnValueOnce(0.9) // kinds[floor(0.9*4)=3] = complaint
+      .mockReturnValue(0)
+    const ev = tryRandomEvent(residents)
+    expect(ev!.kind).toBe('complaint')
+    expect(ev!.moneyBonus).toBe(0)
+    vi.restoreAllMocks()
+  })
+})
+
+describe('afterDoorClose / pendingEvent', () => {
+  it('door_open 終了時に pendingEvent がセットされることがある', () => {
+    // 確率15%なので、確実に発生するよう Math.random をモック
+    vi.spyOn(Math, 'random').mockReturnValue(0.1)
+    const base = createInitialState()
+    const state: GameState = {
+      ...base,
+      elevator: {
+        ...base.elevator,
+        phase: 'door_open',
+        currentFloor: 3,
+        doorTimerMs: 10,
+      },
+    }
+    const next = updateElevator(state, 5000)
+    expect(next.pendingEvent).not.toBeNull()
+    vi.restoreAllMocks()
+  })
+
+  it('gift_food 発生時に money が +30 される', () => {
+    // random=0 → gift_food
+    vi.spyOn(Math, 'random').mockReturnValue(0)
+    const base = createInitialState()
+    const state: GameState = {
+      ...base,
+      money: 100,
+      elevator: {
+        ...base.elevator,
+        phase: 'door_open',
+        currentFloor: 3,
+        doorTimerMs: 10,
+      },
+    }
+    const next = updateElevator(state, 5000)
+    expect(next.pendingEvent!.kind).toBe('gift_food')
+    expect(next.money).toBe(130)
+    vi.restoreAllMocks()
   })
 })

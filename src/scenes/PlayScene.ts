@@ -462,6 +462,20 @@ export class PlayScene extends Container {
   update(deltaMS: number): void {
     this.state = updateElevator(this.state, deltaMS)
 
+    // ランダムイベント検知
+    if (this.state.pendingEvent) {
+      const ev = this.state.pendingEvent
+      const prefix = ev.kind === 'complaint' ? '😠' : '🎁'
+      this.addLog(
+        `${prefix}${ev.residentName}「${ev.text}」`,
+        ev.kind === 'complaint' ? 'miss' : 'correct'
+      )
+      if (ev.moneyBonus > 0) {
+        this.addLog(`  +¥${ev.moneyBonus}`, 'correct')
+      }
+      this.state = { ...this.state, pendingEvent: null }
+    }
+
     // floorCount 変化時にレイアウトを再構築
     if (this.state.floorCount !== this.prevFloorCount) {
       this.addLog(`!! 違法建築で ${this.state.floorCount}Fになった！`, 'miss')
