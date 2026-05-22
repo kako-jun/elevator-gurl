@@ -186,7 +186,7 @@ export class PlayScene extends Container {
   private readonly elevGfx = new Graphics()
   private readonly btnLayerGfx = new Graphics() // ボタン背景
   private readonly timerGfx = new Graphics() // inputタイマーバー
-  private readonly waitingLayerGfx = new Graphics()
+
   private readonly logGfx = new Graphics()
 
   private readonly hudText: Text
@@ -287,8 +287,7 @@ export class PlayScene extends Container {
     // タイマーバー（HUD）→ this に直接
     this.addChild(this.timerGfx)
 
-    // 待機列レイヤー → worldContainer へ
-    this.worldContainer.addChild(this.waitingLayerGfx)
+    // 待機列レイヤー → worldContainer へ（スプライト・テキストプールで描画）
 
     // 乗降ログレイヤー → worldContainer へ
     this.worldContainer.addChild(this.logGfx)
@@ -678,29 +677,6 @@ export class PlayScene extends Container {
     this.floorIndicatorText.x = SHAFT_W / 2
     this.floorIndicatorText.y = elevY - 2
 
-    // チューリン（エレベータガール）の人影
-    const gx = ex + ELEV_W / 2
-    const gy = ey + elevH * 0.2
-    g.circle(gx, gy, 4)
-    g.fill(0xf5c888)
-    g.rect(gx - 4, gy + 4, 8, elevH * 0.4)
-    g.fill(0x2244aa)
-
-    // 移動中: 本を読むシルエット（小さい本を手に持つ）
-    if (elev.phase === 'moving_up' || elev.phase === 'moving_down') {
-      // 本（開いた形）
-      const bx = gx + 5
-      const by = gy + 6
-      g.rect(bx, by, 5, 4)
-      g.fill(0xeedd99)
-      g.rect(bx, by, 5, 4)
-      g.stroke({ color: 0x886644, width: 0.5 })
-      // ページの線
-      g.moveTo(bx + 2.5, by)
-      g.lineTo(bx + 2.5, by + 4)
-      g.stroke({ color: 0x886644, width: 0.5 })
-    }
-
     // 乗客数インジケータ
     const count = this.state.passengers.length
     this.passengerCountText.text = count > 0 ? String(count) : ''
@@ -858,9 +834,6 @@ export class PlayScene extends Container {
   // ─── 待機列UI ─────────────────────────────────────────────────
 
   private refreshWaitingList(): void {
-    const g = this.waitingLayerGfx
-    g.clear()
-
     // 既存テキストを非表示に
     for (const t of this.waitingTextPool) {
       t.visible = false
