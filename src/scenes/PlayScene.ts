@@ -27,6 +27,10 @@ import {
   UI_TEXT_PRIMARY,
   TIME_PALETTE,
   SHAFT_PALETTE,
+  NEON_RED,
+  NEON_YELLOW,
+  NEON_CYAN,
+  NEON_ORANGE,
 } from '../constants/colors'
 import { TOD_LABEL } from '../constants/labels'
 import {
@@ -106,6 +110,31 @@ const COLOR_LOG_MISS = 0xee6644
 /** 乗客数インジケータ色（エレベータ箱の暗色に合わせる） */
 const COLOR_PASSENGER_COUNT = COLOR_HUD_BG
 
+/** 看板テキストプール（ネオン・張り紙・スローガン） */
+const NEON_SIGNS = [
+  '福',
+  '囍',
+  '招財進寶',
+  '一路平安',
+  '吉祥',
+  '龍',
+  '鳳',
+  'ネコと和解せよ',
+  '立入禁止',
+  '요주의',
+  '←非常口',
+  '唐辛子屋',
+  '易經占卜',
+  '麻雀館',
+  '理髮',
+  '豆腐坊',
+  '管理人室',
+  '立食そば',
+  '無断駐輪禁止',
+  '工事中',
+]
+const NEON_COLORS = [NEON_RED, NEON_YELLOW, NEON_CYAN, NEON_ORANGE]
+
 /** 乗降オーバーレイボックスの幅（SHAFT_W右端〜NAME_X手前くらいまで） */
 const BOARDING_OVERLAY_W = 110
 
@@ -171,6 +200,7 @@ export class PlayScene extends Container {
     gfx: Graphics
     labelText: Text // "NF"
     nameText: Text // 押した客の名前
+    neonText: Text // 看板・張り紙
   }> = []
 
   constructor() {
@@ -370,7 +400,25 @@ export class PlayScene extends Container {
       nameText.y = by + btnH / 2
       this.worldContainer.addChild(nameText)
 
-      this.floorBtns.push({ floor, gfx, labelText, nameText })
+      // 看板テキスト（右余白にランダム配置）
+      const sign = NEON_SIGNS[Math.floor(Math.random() * NEON_SIGNS.length)]
+      const neonColor =
+        NEON_COLORS[Math.floor(Math.random() * NEON_COLORS.length)]
+      const neonText = new Text({
+        text: sign,
+        style: {
+          fontFamily: 'monospace',
+          fontSize: 9,
+          fill: neonColor,
+        },
+      })
+      neonText.anchor.set(1, 0.5)
+      neonText.x = BUILDING_RIGHT - 4
+      neonText.y = by + btnH / 2
+      neonText.alpha = 0.75
+      this.worldContainer.addChild(neonText)
+
+      this.floorBtns.push({ floor, gfx, labelText, nameText, neonText })
     }
   }
 
@@ -980,6 +1028,7 @@ export class PlayScene extends Container {
       btn.gfx.destroy()
       btn.labelText.destroy()
       btn.nameText.destroy()
+      btn.neonText.destroy()
     }
     this.floorBtns.splice(0)
 
