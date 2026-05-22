@@ -10,8 +10,16 @@
  */
 import { Container, Graphics, Text } from 'pixi.js'
 import type { KeyboardCommand, KeyboardManager } from '../input/KeyboardManager'
-import { UI_PRIMARY, UI_SECONDARY, UI_TEXT_PRIMARY } from '../constants/colors'
+import {
+  UI_PRIMARY,
+  UI_SECONDARY,
+  UI_TEXT_PRIMARY,
+  TIME_PALETTE,
+} from '../constants/colors'
 import type { SoundManager } from '../audio/SoundManager'
+
+/** タイトルロゴ「囡」専用の暖色 (PlayScene の LAMP_WARM と同値)。タイトル画面演出専用。 */
+const LOGO_COLOR = 0xffaa44
 
 export type TitleAction = 'start'
 
@@ -23,7 +31,7 @@ const BUTTON_RADIUS = 8
 /** ロゴ・副題のレイアウト基点 (TitleScene ローカル座標で「中心」)。 */
 const LOGO_OFFSET_Y = -140
 const SUBTITLE_OFFSET_Y = -56
-const BUTTON_OFFSET_Y = 40
+const BUTTON_OFFSET_Y = 60
 
 interface ButtonEntry {
   action: TitleAction
@@ -48,14 +56,19 @@ export class TitleScene extends Container {
     this.onSelect = onSelect
     this.soundManager = soundManager
 
+    // 背景矩形。
+    const bg = new Graphics()
+    bg.rect(-180, -320, 360, 640).fill({ color: TIME_PALETTE.night.bg })
+    this.addChild(bg)
+
     // ロゴ (漢字タイトル)。
     const logo = new Text({
       text: '囡',
       style: {
-        fontFamily: 'Inter, system-ui, sans-serif',
+        fontFamily: '"Noto Serif SC", "Source Han Serif SC", serif',
         fontSize: 96,
         fontWeight: '700',
-        fill: UI_TEXT_PRIMARY,
+        fill: LOGO_COLOR,
         align: 'center',
       },
     })
@@ -64,22 +77,38 @@ export class TitleScene extends Container {
     logo.y = LOGO_OFFSET_Y
     this.addChild(logo)
 
-    // 副題。
-    const subtitle = new Text({
-      text: 'ヱレベヰターガール',
+    // 副題 (2行)。
+    const subtitleTop = new Text({
+      text: '\u2015\u2015 an elevator girl \u2015\u2015',
       style: {
         fontFamily: 'Inter, system-ui, sans-serif',
-        fontSize: 18,
+        fontSize: 14,
         fontWeight: '400',
         fill: UI_TEXT_PRIMARY,
         align: 'center',
       },
     })
-    subtitle.anchor.set(0.5)
-    subtitle.alpha = 0.7
-    subtitle.x = 0
-    subtitle.y = SUBTITLE_OFFSET_Y
-    this.addChild(subtitle)
+    subtitleTop.anchor.set(0.5)
+    subtitleTop.alpha = 0.6 // 英語行は正式名称より控えめに
+    subtitleTop.x = 0
+    subtitleTop.y = SUBTITLE_OFFSET_Y - 14
+    this.addChild(subtitleTop)
+
+    const subtitleBottom = new Text({
+      text: '【电梯姐姐・ヱレベヰターガール】',
+      style: {
+        fontFamily: 'Inter, system-ui, sans-serif',
+        fontSize: 16,
+        fontWeight: '400',
+        fill: UI_TEXT_PRIMARY,
+        align: 'center',
+      },
+    })
+    subtitleBottom.anchor.set(0.5)
+    subtitleBottom.alpha = 0.8
+    subtitleBottom.x = 0
+    subtitleBottom.y = SUBTITLE_OFFSET_Y + 4
+    this.addChild(subtitleBottom)
 
     // スタートボタン (1 個だけ)。
     this.addButton('start', 'スタート', 0, BUTTON_OFFSET_Y)
