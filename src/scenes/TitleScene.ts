@@ -18,6 +18,7 @@ import {
 } from '../constants/colors'
 import type { SoundManager } from '../audio/SoundManager'
 
+/** タイトルロゴ「囡」専用の暖色 (PlayScene の LAMP_WARM と同値)。タイトル画面演出専用。 */
 const LOGO_COLOR = 0xffaa44
 
 export type TitleAction = 'start'
@@ -88,7 +89,7 @@ export class TitleScene extends Container {
       },
     })
     subtitleTop.anchor.set(0.5)
-    subtitleTop.alpha = 0.6
+    subtitleTop.alpha = 0.6 // 英語行は正式名称より控えめに
     subtitleTop.x = 0
     subtitleTop.y = SUBTITLE_OFFSET_Y - 14
     this.addChild(subtitleTop)
