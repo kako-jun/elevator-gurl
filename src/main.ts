@@ -113,6 +113,12 @@ async function bootstrap(): Promise<void> {
   playScene.y = SCENE_TRANSFORMS.play.y
   sceneManager.world.addChild(playScene)
 
+  playScene.setGameOverCallback((score, mistakes) => {
+    resultScene.setResult({ kind: 'gameover', score, mistakes })
+    setActiveScene('result')
+    void sceneManager.navigateTo('result', 800)
+  })
+
   // --- Result --- (常駐。setResult で内容だけ差し替える)
   const resultScene = new ResultScene({
     soundManager: sound,
@@ -159,8 +165,10 @@ async function bootstrap(): Promise<void> {
       case 'play':
         activeUnsub = playScene.attachInputs(keyboard, touch, () => {
           // Esc はギブアップ扱いで Result へ遷移する (Issue #11)。
-          // スコアは未実装のため undefined (score 行は非表示)。
-          resultScene.setResult({ kind: 'gameover' })
+          resultScene.setResult({
+            kind: 'gameover',
+            score: playScene.getScore(),
+          })
           setActiveScene('result')
           void sceneManager.navigateTo('result', 800)
         })

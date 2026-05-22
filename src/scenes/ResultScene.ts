@@ -30,7 +30,7 @@ export interface ResultSceneOptions {
 }
 
 const HEADLINE_TEXT: Record<ResultKind, string> = {
-  gameover: 'お疲れさま',
+  gameover: 'ゲームオーバー',
   clear: 'クリア！',
 }
 
@@ -116,11 +116,19 @@ export class ResultScene extends Container {
    * シーンを破棄せず常駐させたまま見出しとスコアだけ差し替える。
    * `score` を渡さない (または undefined) なら SCORE 行は非表示にする。
    */
-  setResult(opts: { kind: ResultKind; score?: number }): void {
+  setResult(opts: {
+    kind: ResultKind
+    score?: number
+    mistakes?: number
+  }): void {
     this.currentKind = opts.kind
     this.headline.text = HEADLINE_TEXT[opts.kind]
     if (opts.score !== undefined) {
-      this.scoreText.text = `SCORE: ${opts.score}`
+      const lines = [`SCORE: ${opts.score}`]
+      if (opts.mistakes !== undefined) {
+        lines.push(`ミス: ${opts.mistakes}`)
+      }
+      this.scoreText.text = lines.join('\n')
       this.scoreText.visible = true
     } else {
       this.scoreText.text = ''
