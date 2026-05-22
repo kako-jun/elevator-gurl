@@ -50,6 +50,9 @@ import {
 const VIEW_W = 360
 const VIEW_H = 640
 
+/** 1フロアの最小ピクセル高さ（高層階スクロールモード） */
+const MIN_FLOOR_H = 52
+
 /** エレベータシャフト幅 */
 const SHAFT_W = 36
 /** ビル右端X */
@@ -108,6 +111,9 @@ const BOARDING_OVERLAY_W = 110
 
 export class PlayScene extends Container {
   private state: GameState
+
+  /** worldContainer: スクロールする描画要素のコンテナ */
+  private worldContainer: Container
 
   /** 1フロアの高さ（floorCount 変化時に更新） */
   private floorH: number
@@ -178,7 +184,11 @@ export class PlayScene extends Container {
       fill: UI_TEXT_PRIMARY,
     }
 
-    // HUD
+    // worldContainer（スクロール対象の描画要素を格納）
+    this.worldContainer = new Container()
+    this.addChild(this.worldContainer)
+
+    // HUD（スクロールしない）
     this.addChild(this.hudGfx)
 
     this.hudText = new Text({
@@ -199,40 +209,40 @@ export class PlayScene extends Container {
     this.phaseText.y = 38
     this.addChild(this.phaseText)
 
-    // ビル断面（背景は毎フレーム更新、静的部分は1回）
-    this.addChild(this.buildingBgGfx)
-    this.addChild(this.buildingStaticGfx)
+    // ビル断面（背景は毎フレーム更新、静的部分は1回）→ worldContainer へ
+    this.worldContainer.addChild(this.buildingBgGfx)
+    this.worldContainer.addChild(this.buildingStaticGfx)
     this.drawBuildingStatic()
     this.drawBuildingBg()
 
-    // ボタン層
-    this.addChild(this.btnLayerGfx)
+    // ボタン層 → worldContainer へ
+    this.worldContainer.addChild(this.btnLayerGfx)
 
-    // エレベータ（毎フレーム再描画）
-    this.addChild(this.elevGfx)
+    // エレベータ（毎フレーム再描画）→ worldContainer へ
+    this.worldContainer.addChild(this.elevGfx)
 
-    // タイマーバー
+    // タイマーバー（HUD）→ this に直接
     this.addChild(this.timerGfx)
 
-    // 待機列レイヤー
-    this.addChild(this.waitingLayerGfx)
+    // 待機列レイヤー → worldContainer へ
+    this.worldContainer.addChild(this.waitingLayerGfx)
 
-    // 乗降ログレイヤー
-    this.addChild(this.logGfx)
+    // 乗降ログレイヤー → worldContainer へ
+    this.worldContainer.addChild(this.logGfx)
 
-    // 乗降オーバーレイレイヤー
-    this.addChild(this.boardingOverlayGfx)
+    // 乗降オーバーレイレイヤー → worldContainer へ
+    this.worldContainer.addChild(this.boardingOverlayGfx)
 
-    // 現在階インジケータ
+    // 現在階インジケータ → worldContainer へ
     this.floorIndicatorText = new Text({
       text: '1F',
       style: { ...baseStyle, fontSize: 10 },
     })
     this.floorIndicatorText.anchor.set(0.5, 1)
     this.floorIndicatorText.x = SHAFT_W / 2
-    this.addChild(this.floorIndicatorText)
+    this.worldContainer.addChild(this.floorIndicatorText)
 
-    // 乗客数インジケータ（エレベータ箱内に重ねて表示）
+    // 乗客数インジケータ（エレベータ箱内に重ねて表示）→ worldContainer へ
     this.passengerCountText = new Text({
       text: '',
       style: {
@@ -242,7 +252,7 @@ export class PlayScene extends Container {
       },
     })
     this.passengerCountText.anchor.set(0.5, 0.5)
-    this.addChild(this.passengerCountText)
+    this.worldContainer.addChild(this.passengerCountText)
 
     // 各階のボタンを生成（2階〜FLOOR_COUNT階）
     this.buildFloorButtons()
@@ -269,18 +279,14 @@ export class PlayScene extends Container {
 
     const bgColor = this.buildingColorForTime(this.state.gameTimeMinutes)
     const shaftColor = this.shaftColorForTime(this.state.gameTimeMinutes)
+    const buildingH = this.state.floorCount * this.floorH
 
     // ビル本体背景
-    g.rect(
-      SHAFT_W,
-      BUILDING_TOP,
-      BUILDING_RIGHT - SHAFT_W,
-      BUILDING_BOTTOM - BUILDING_TOP
-    )
+    g.rect(SHAFT_W, BUILDING_TOP, BUILDING_RIGHT - SHAFT_W, buildingH)
     g.fill(bgColor)
 
     // シャフト
-    g.rect(0, BUILDING_TOP, SHAFT_W, BUILDING_BOTTOM - BUILDING_TOP)
+    g.rect(0, BUILDING_TOP, SHAFT_W, buildingH)
     g.fill(shaftColor)
   }
 
@@ -291,6 +297,7 @@ export class PlayScene extends Container {
 
     const floorCount = this.state.floorCount
     const floorH = this.floorH
+    const buildingH = floorCount * floorH
 
     // 各階の床ライン
     for (let f = 1; f <= floorCount; f++) {
@@ -300,7 +307,7 @@ export class PlayScene extends Container {
     }
 
     // 建物外枠
-    g.rect(0, BUILDING_TOP, BUILDING_RIGHT, BUILDING_BOTTOM - BUILDING_TOP)
+    g.rect(0, BUILDING_TOP, BUILDING_RIGHT, buildingH)
     g.stroke({ color: COLOR_FLOOR_LINE, width: 2 })
 
     // 各階番号ラベルと窓
@@ -338,7 +345,7 @@ export class PlayScene extends Container {
       gfx.on('pointerdown', () => {
         this.onPlayerPressFloor(floor)
       })
-      this.addChild(gfx)
+      this.worldContainer.addChild(gfx)
 
       const labelText = new Text({
         text: `${floor}F`,
@@ -352,7 +359,7 @@ export class PlayScene extends Container {
       labelText.anchor.set(0.5, 0.5)
       labelText.x = BTN_X + BTN_W / 2
       labelText.y = by + btnH / 2
-      this.addChild(labelText)
+      this.worldContainer.addChild(labelText)
 
       const nameText = new Text({
         text: '',
@@ -361,7 +368,7 @@ export class PlayScene extends Container {
       nameText.anchor.set(0, 0.5)
       nameText.x = NAME_X
       nameText.y = by + btnH / 2
-      this.addChild(nameText)
+      this.worldContainer.addChild(nameText)
 
       this.floorBtns.push({ floor, gfx, labelText, nameText })
     }
@@ -475,6 +482,8 @@ export class PlayScene extends Container {
     this.prevPhase = this.state.elevator.phase
     this.prevPassengers = [...this.state.passengers]
 
+    this.updateCamera()
+
     if (this.state.isGameOver && !this._gameOverFired) {
       this._gameOverFired = true
       if (this.state.isClear) {
@@ -487,6 +496,27 @@ export class PlayScene extends Container {
         )
       }
     }
+  }
+
+  private updateCamera(): void {
+    const floorCount = this.state.floorCount
+    const totalH = MIN_FLOOR_H * floorCount
+    if (totalH <= BUILDING_BOTTOM - BUILDING_TOP) {
+      // 全景に収まる場合はスクロールしない
+      this.worldContainer.y = 0
+      return
+    }
+    // エレベーターの現在Y座標（world座標）を中心にカメラを合わせる
+    const elev = this.state.elevator
+    const floorH = this.floorH
+    const buildingTop = BUILDING_TOP
+    const elevWorldY = buildingTop + (floorCount - elev.currentFloor) * floorH
+    // カメラ中心をエレベーターに合わせる
+    const targetY = VIEW_H / 2 - elevWorldY
+    // 上端・下端クランプ
+    const minY = VIEW_H - 8 - (buildingTop + floorCount * floorH)
+    const maxY = 0
+    this.worldContainer.y = Math.max(minY, Math.min(maxY, targetY))
   }
 
   private drawElevator(): void {
@@ -729,7 +759,7 @@ export class PlayScene extends Container {
           },
         })
         t.anchor.set(0, 0.5)
-        this.addChild(t)
+        this.worldContainer.addChild(t)
         this.waitingTextPool.push(t)
       }
       // テキストプールを通常アイテムとして再利用する際に色を確定させる
@@ -756,7 +786,7 @@ export class PlayScene extends Container {
           },
         })
         t.anchor.set(0, 0.5)
-        this.addChild(t)
+        this.worldContainer.addChild(t)
         this.waitingTextPool.push(t)
       }
       // テキストプールを「...他N人」として再利用する際に色を確定させる
@@ -799,7 +829,7 @@ export class PlayScene extends Container {
           style: { fontFamily: 'monospace', fontSize: 9, fill: COLOR_LOG_TEXT },
         })
         t.anchor.set(0, 0.5)
-        this.addChild(t)
+        this.worldContainer.addChild(t)
         this.logTextPool.push(t)
       }
       const color =
@@ -852,7 +882,7 @@ export class PlayScene extends Container {
           style: { fontFamily: 'monospace', fontSize: 12, fill: LAMP_WARM },
         })
         t.anchor.set(0, 0.5)
-        this.addChild(t)
+        this.worldContainer.addChild(t)
         this.boardingOverlayTexts.push(t)
       }
       t.text = text
@@ -907,7 +937,13 @@ export class PlayScene extends Container {
 
   /** floorCount 変化時にレイアウトを再構築する */
   private rebuildLayout(): void {
-    this.floorH = (BUILDING_BOTTOM - BUILDING_TOP) / this.state.floorCount
+    const floorCount = this.state.floorCount
+    const totalH = MIN_FLOOR_H * floorCount
+    if (totalH <= BUILDING_BOTTOM - BUILDING_TOP) {
+      this.floorH = (BUILDING_BOTTOM - BUILDING_TOP) / floorCount
+    } else {
+      this.floorH = MIN_FLOOR_H
+    }
 
     // 既存の floorBtns を破棄
     for (const btn of this.floorBtns) {
