@@ -6,7 +6,7 @@
 
 | ファイル                            | サイズ  | 内容                             |
 | ----------------------------------- | ------- | -------------------------------- |
-| public/assets/building-bg.png       | 360×592 | ビル外壁ドット絵背景             |
+| public/assets/building-bg.png       | 360×584 | ビル外壁ドット絵背景             |
 | public/assets/turing-idle.png       | 20×32   | チューリン 待機ポーズ（コマ0）   |
 | public/assets/turing-reading.png    | 20×32   | チューリン 読書中ポーズ（コマ1） |
 | public/assets/resident-normal-0.png | 16×24   | 一般住民 コマ0                   |

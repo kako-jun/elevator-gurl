@@ -25,6 +25,7 @@ import {
   UI_PRIMARY,
   UI_SECONDARY,
   UI_TEXT_PRIMARY,
+  UI_TEXT_DIM,
   TIME_PALETTE,
   SHAFT_PALETTE,
   NEON_RED,
@@ -94,6 +95,13 @@ const COLOR_BTN_SELF = 0xaa2222 // 客自身が押した（不正解）
 const COLOR_BTN_AUTO = 0x1a4a2a // 上の階から乗ってくる客（1階行き自動）
 const COLOR_BTN_CHILD = 0xcc9922 // 子供の悪戯（黄色系）
 const COLOR_DOOR_OPEN = 0x3a6a8a // 扉が開いているときの背景
+/** auto 客（上の階から1F行き）の名前テキスト色 */
+const COLOR_NAME_AUTO = 0x88cc88
+/** 窓のガラス色 */
+const COLOR_WINDOW_FILL = 0x3a5a7a
+const COLOR_WINDOW_STROKE = 0x5a8aaa
+/** 乗降オーバーレイの半透明背景色 */
+const COLOR_OVERLAY_BG = 0x000000
 
 /** inputフェーズのタイムバー色 */
 const COLOR_TIMER_BAR = 0x44cc88
@@ -247,7 +255,7 @@ export class PlayScene extends Container {
 
     this.phaseText = new Text({
       text: '',
-      style: { ...baseStyle, fontSize: 11, fill: 0xaaaaaa },
+      style: { ...baseStyle, fontSize: 11, fill: UI_TEXT_DIM },
     })
     this.phaseText.anchor.set(1, 0.5)
     this.phaseText.x = VIEW_W - 8
@@ -399,9 +407,9 @@ export class PlayScene extends Container {
           const wx = NAME_X + 10 + w * 50
           const wy = floorMidY - 7
           g.rect(wx, wy, 14, 14)
-          g.fill(0x3a5a7a)
+          g.fill(COLOR_WINDOW_FILL)
           g.rect(wx, wy, 14, 14)
-          g.stroke({ color: 0x5a8aaa, width: 1 })
+          g.stroke({ color: COLOR_WINDOW_STROKE, width: 1 })
         }
       }
     }
@@ -544,7 +552,7 @@ export class PlayScene extends Container {
             passenger.pressedBy === 'self'
               ? COLOR_BTN_SELF
               : passenger.pressedBy === 'auto'
-                ? 0x88cc88
+                ? COLOR_NAME_AUTO
                 : UI_TEXT_PRIMARY
         }
       } else {
@@ -1008,7 +1016,7 @@ export class PlayScene extends Container {
 
     // 半透明の黒背景矩形
     g.rect(boxX, boxY, boxW, boxH)
-    g.fill({ color: 0x000000, alpha: 0.72 })
+    g.fill({ color: COLOR_OVERLAY_BG, alpha: 0.72 })
 
     for (let i = 0; i < this.boardingOverlayLines.length; i++) {
       const { text } = this.boardingOverlayLines[i]

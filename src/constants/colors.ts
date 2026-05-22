@@ -20,6 +20,9 @@ export const UI_SECONDARY = 0x06b6d4
 /** 本文テキストに使う白 (`text-primary`)。 */
 export const UI_TEXT_PRIMARY = 0xffffff
 
+/** 補助テキスト用の灰色 (`text-dim`)。 */
+export const UI_TEXT_DIM = 0xaaaaaa
+
 /** 時刻ごとのビル背景色・環境光色 */
 export const TIME_PALETTE: Record<TimeOfDay, { bg: number; ambient: number }> =
   {
@@ -42,9 +45,9 @@ export const RAIN_OVERLAY: { bg: number; ambient: number } = {
 
 /** ネオン・看板色 */
 export const NEON_RED = 0xff2244
-export const NEON_YELLOW = 0xffdd00
-export const NEON_CYAN = 0x00eeff
-export const NEON_ORANGE = 0xff8800
+export const NEON_YELLOW = 0xffcc00
+export const NEON_CYAN = 0x00ddcc
+export const NEON_ORANGE = 0xff6600
 
 /** 時刻ごとのシャフト色（ambient をベースに少し暗くした値） */
 export const SHAFT_PALETTE: Record<TimeOfDay, number> = {
@@ -55,3 +58,6 @@ export const SHAFT_PALETTE: Record<TimeOfDay, number> = {
   evening: 0x0d0a14,
   night: 0x0d0d1a,
 }
+
+/** エンディングテキスト色（古い羊皮紙・蝋燭光） */
+export const COLOR_ENDING_TEXT = 0xddccaa

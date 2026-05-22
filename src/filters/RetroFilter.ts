@@ -25,8 +25,8 @@ uniform float uVignetteStrength;
 void main() {
   vec4 color = texture(uTexture, vUv);
 
-  // スキャンライン
-  float scanline = sin(vUv.y * 320.0) * 0.5 + 0.5;
+  // スキャンライン（uTime で微小にちらつかせる）
+  float scanline = sin(vUv.y * 320.0 + uTime * 0.5) * 0.5 + 0.5;
   color.rgb -= (1.0 - scanline) * uScanlineStrength;
 
   // ビネット

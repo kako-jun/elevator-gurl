@@ -242,6 +242,9 @@ describe('updateElevator', () => {
     let state = boardPassengers(createInitialState())
     state = finalizeInput(state)
     expect(state.elevator.phase).toBe('moving_up')
+    // finalizeInput でゲームオーバーになっていると updateElevator が早期リターンするため
+    // isGameOver=false を明示してエレベータの物理動作だけを検証する
+    state = { ...state, isGameOver: false }
     const next = updateElevator(state, 200)
     expect(next.elevator.currentFloor).toBeGreaterThan(1)
   })
@@ -253,6 +256,7 @@ describe('updateElevator', () => {
     const target = state.elevator.nextStopFloor!
     state = {
       ...state,
+      isGameOver: false, // finalizeInput でゲームオーバーになっている場合に備えてリセット
       elevator: {
         ...state.elevator,
         phase: 'door_open',
@@ -262,6 +266,12 @@ describe('updateElevator', () => {
     }
     const next = updateElevator(state, DOOR_OPEN_MS + 1)
     expect(['moving_up', 'moving_down']).toContain(next.elevator.phase)
+  })
+
+  it('isGameOver=true の場合 updateElevator は状態を変えずに早期リターンする', () => {
+    const state = { ...createInitialState(), isGameOver: true }
+    const next = updateElevator(state, 10000)
+    expect(next).toBe(state)
   })
 })
 
