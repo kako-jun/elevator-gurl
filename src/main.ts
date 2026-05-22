@@ -9,6 +9,7 @@
  * ゲームロジックそのものは未実装。各シーンの中身は後続 Issue で詰める。
  */
 import { Application } from 'pixi.js'
+import { RetroFilter } from './filters/RetroFilter'
 import { SceneManager, type SceneKey } from './scenes/SceneManager'
 import { TitleScene } from './scenes/TitleScene'
 import { PlayScene } from './scenes/PlayScene'
@@ -50,6 +51,10 @@ async function bootstrap(): Promise<void> {
     autoDensity: true,
   })
   container.appendChild(app.canvas)
+
+  // RetroFilter (スキャンライン + ビネット)
+  const retroFilter = new RetroFilter()
+  app.stage.filters = [retroFilter]
 
   // ---------------------------------------------------------------------
   // 入力 Manager (全シーン共有)
@@ -150,6 +155,7 @@ async function bootstrap(): Promise<void> {
 
   // 1 個の Ticker で全部を回す。
   app.ticker.add(ticker => {
+    retroFilter.tick(ticker.deltaMS)
     sceneManager.update(ticker.deltaMS)
     if (isPlayActive) {
       playScene.update(ticker.deltaMS)
