@@ -101,6 +101,9 @@ const COLOR_LOG_TEXT = 0xaaccff
 /** 乗客数インジケータ色（エレベータ箱の暗色に合わせる） */
 const COLOR_PASSENGER_COUNT = COLOR_HUD_BG
 
+/** 乗降オーバーレイボックスの幅（SHAFT_W右端〜NAME_X手前くらいまで） */
+const BOARDING_OVERLAY_W = 110
+
 export class PlayScene extends Container {
   private state: GameState
 
@@ -542,7 +545,8 @@ export class PlayScene extends Container {
       const lines: Array<{ text: string }> = []
 
       if (currentFloor === 1) {
-        // boarding フェーズ（1階）: waitingQueue から上位3人のみ
+        // 1F boarding フェーズ: waitingQueue から上位3人のみ表示（階数は非表示 = 覚えていないと押せない設計）
+        // passengerNames は1F分岐では参照しない（1F到着時には全員降車済みでpassengersは空のため）
         const queue = this.state.waitingQueue
         const showCount = Math.min(queue.length, 3)
         for (let i = 0; i < showCount; i++) {
@@ -550,6 +554,7 @@ export class PlayScene extends Container {
         }
         const remaining = queue.length - showCount
         if (remaining > 0) {
+          // 「...他N人」フォーマットは refreshWaitingList の待機列表示と共通の文言
           lines.push({ text: `...他${remaining}人` })
         }
       } else {
@@ -741,7 +746,7 @@ export class PlayScene extends Container {
 
     const lineH = 16
     const padding = 6
-    const boxW = 110
+    const boxW = BOARDING_OVERLAY_W
     const boxH = this.boardingOverlayLines.length * lineH + padding * 2
     const boxX = SHAFT_W + 4
     const boxY = BUILDING_TOP + 4
@@ -810,6 +815,9 @@ export class PlayScene extends Container {
       t.visible = false
     }
     for (const t of this.logTextPool) {
+      t.visible = false
+    }
+    for (const t of this.boardingOverlayTexts) {
       t.visible = false
     }
     this.prevPhase = null
