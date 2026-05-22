@@ -100,6 +100,7 @@ function makeState(overrides: Partial<GameState>): GameState {
     gameTimeMinutes: 420,
     weather: 'clear',
     floorCount: 8,
+    pendingEvent: null,
   }
   return { ...base, ...overrides }
 }

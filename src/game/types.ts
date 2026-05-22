@@ -33,6 +33,18 @@ export const FLOOR_COUNT_MAX = 12
 /** 1階の待機客の上限 */
 export const MAX_WAITING = 10
 
+/** ランダムイベント種別 */
+export type EventKind = 'gift_food' | 'gift_book' | 'cheer' | 'complaint'
+
+/** ランダムイベント結果 */
+export interface RandomEvent {
+  kind: EventKind
+  residentName: string
+  text: string
+  /** お金へのボーナス（差し入れ食料は +30、差し入れ本は 0） */
+  moneyBonus: number
+}
+
 /** 住民タイプ */
 export type ResidentType = 'normal' | 'elder' | 'child'
 
@@ -115,6 +127,8 @@ export interface GameState {
   weather: Weather
   /** 現在のビル階数（違法建築で増加、初期値 = FLOOR_COUNT） */
   floorCount: number
+  /** 直近のランダムイベント（表示後 null にする） */
+  pendingEvent: RandomEvent | null
 }
 
 /** 住民データベース（固定）— 九龍城ウォールド風の広東人住民 */

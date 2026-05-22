@@ -11,7 +11,9 @@ import {
   RESIDENTS_DB,
   type GameState,
   type ElevatorState,
+  type EventKind,
   type Passenger,
+  type RandomEvent,
   type Resident,
   type TimeOfDay,
 } from './types'
@@ -34,6 +36,50 @@ export const TUITION_GOAL = 10000
 
 /** 1トリップで進むゲーム内時間（分） */
 export const MINUTES_PER_TRIP = 30
+
+// ─── ランダムイベント ────────────────────────────────────────────
+
+const EVENT_TEMPLATES: Record<
+  EventKind,
+  { texts: string[]; moneyBonus: number }
+> = {
+  gift_food: {
+    texts: ['これ、食べな', 'お腹すいてるやろ？', '作りすぎたから'],
+    moneyBonus: 30,
+  },
+  gift_book: {
+    texts: ['この本、あげるよ', '読み終わったから', '勉強頑張りや'],
+    moneyBonus: 0,
+  },
+  cheer: {
+    texts: ['いつもありがとう', '助かってるよ', 'あんたは偉い'],
+    moneyBonus: 0,
+  },
+  complaint: {
+    texts: ['また遅い！', 'もっと早くしてよ', 'やる気あるの？'],
+    moneyBonus: 0,
+  },
+}
+
+/**
+ * door_open フェーズ終了時に低確率でランダムイベントを発生させる。
+ * 確率: 15%
+ */
+export function tryRandomEvent(residents: Resident[]): RandomEvent | null {
+  if (Math.random() > 0.15) return null
+  const kinds: EventKind[] = ['gift_food', 'gift_book', 'cheer', 'complaint']
+  const kind = kinds[Math.floor(Math.random() * kinds.length)]
+  const resident = residents[Math.floor(Math.random() * residents.length)]
+  const templates = EVENT_TEMPLATES[kind]
+  const text =
+    templates.texts[Math.floor(Math.random() * templates.texts.length)]
+  return {
+    kind,
+    residentName: resident.nameZh,
+    text,
+    moneyBonus: templates.moneyBonus,
+  }
+}
 
 // ─── 時刻ヘルパ ──────────────────────────────────────────────
 
@@ -103,6 +149,7 @@ export function createInitialState(): GameState {
     gameTimeMinutes: 420, // 朝7時スタート
     weather: 'clear',
     floorCount: FLOOR_COUNT,
+    pendingEvent: null,
   }
 }
 
@@ -391,9 +438,14 @@ function afterDoorClose(state: GameState): GameState {
   const nextPhase =
     nextStop !== null ? ('moving_up' as const) : ('moving_down' as const)
 
+  const event = tryRandomEvent(RESIDENTS_DB)
+  const moneyBonus = event ? event.moneyBonus : 0
+
   return {
     ...state,
     passengers: newPassengers,
+    money: state.money + moneyBonus,
+    pendingEvent: event,
     elevator: {
       ...state.elevator,
       phase: nextPhase,
