@@ -99,6 +99,10 @@ const COLOR_WAITING_TEXT = 0xddcc88
 const COLOR_WAITING_MORE = 0x888866
 /** ログテキスト色 */
 const COLOR_LOG_TEXT = 0xaaccff
+/** ログ: 正解・正しく届けた（緑） */
+const COLOR_LOG_CORRECT = 0x99ee99
+/** ログ: ミス・客自押し（赤橙） */
+const COLOR_LOG_MISS = 0xee6644
 /** 乗客数インジケータ色（エレベータ箱の暗色に合わせる） */
 const COLOR_PASSENGER_COUNT = COLOR_HUD_BG
 
@@ -127,7 +131,10 @@ export class PlayScene extends Container {
   private prevPassengers: Passenger[] = []
 
   // ─── 乗降ログ ─────────────────────────────────────────────────
-  private readonly logLines: string[] = []
+  private readonly logLines: Array<{
+    text: string
+    kind: 'normal' | 'correct' | 'miss'
+  }> = []
 
   // ─── PixiJS オブジェクト ──────────────────────────────────────
   private readonly hudGfx = new Graphics()
@@ -610,21 +617,29 @@ export class PlayScene extends Container {
       // 降りた客: prevPassengers にいて新しい passengers にいない人
       for (const p of this.prevPassengers) {
         if (!newNames.has(p.resident.name)) {
-          this.addLog(`${currentFloor}F: ${p.resident.nameZh} ↓`)
+          // p 自身の pressedBy で正解/ミス/通常を判定する
+          // auto の客（上の階から乗ってきた1F行き）は pressedBy='auto' で 'normal' 扱い
+          const kind =
+            p.pressedBy === 'player'
+              ? 'correct'
+              : p.pressedBy === 'self'
+                ? 'miss'
+                : 'normal'
+          this.addLog(`${currentFloor}F: ${p.resident.nameZh} ↓`, kind)
         }
       }
 
       // 乗ってきた客: 新しい passengers にいて prevPassengers にいない人
       for (const p of this.state.passengers) {
         if (!prevNames.has(p.resident.name) && p.pressedBy === 'auto') {
-          this.addLog(`${currentFloor}F: ${p.resident.nameZh} ↑1F`)
+          this.addLog(`${currentFloor}F: ${p.resident.nameZh} ↑1F`, 'normal')
         }
       }
     }
   }
 
-  private addLog(line: string): void {
-    this.logLines.push(line)
+  private addLog(line: string, kind: 'normal' | 'correct' | 'miss'): void {
+    this.logLines.push({ text: line, kind })
     if (this.logLines.length > 3) this.logLines.shift()
   }
 
@@ -724,6 +739,7 @@ export class PlayScene extends Container {
     const lineH = 12
 
     for (let i = 0; i < this.logLines.length; i++) {
+      const { text, kind } = this.logLines[i]
       const y = floor1Y + 6 + i * lineH
 
       let t = this.logTextPool[i]
@@ -736,7 +752,14 @@ export class PlayScene extends Container {
         this.addChild(t)
         this.logTextPool.push(t)
       }
-      t.text = this.logLines[i]
+      const color =
+        kind === 'correct'
+          ? COLOR_LOG_CORRECT
+          : kind === 'miss'
+            ? COLOR_LOG_MISS
+            : COLOR_LOG_TEXT
+      t.style.fill = color
+      t.text = text
       t.x = NAME_X
       t.y = y
       t.visible = true
@@ -811,6 +834,14 @@ export class PlayScene extends Container {
   /** 賢さ（移動中に本を読んだ時間 ms） */
   getScore(): number {
     return this.state.score
+  }
+
+  /** テスト用: ログ行リストを返す */
+  getLogLines(): ReadonlyArray<{
+    text: string
+    kind: 'normal' | 'correct' | 'miss'
+  }> {
+    return this.logLines
   }
 
   attachInputs(

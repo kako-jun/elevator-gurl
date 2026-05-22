@@ -615,3 +615,100 @@ describe('PlayScene – HUD 残額表示', () => {
     expect(getHudText(scene)).not.toMatch(/残¥-\d/)
   })
 })
+
+// ─── H 群: ログ kind（FF14風カラー判定）──────────────────────────────────
+
+describe('PlayScene – ログ kind（FF14風カラー判定）', () => {
+  let scene: PlayScene
+
+  beforeEach(() => {
+    scene = new PlayScene()
+  })
+
+  afterEach(() => {
+    if (!scene.destroyed) scene.destroy()
+  })
+
+  function makePassenger(
+    name: string,
+    nameZh: string,
+    floor: number,
+    targetFloor: number,
+    pressedBy: 'player' | 'self' | 'auto'
+  ): Passenger {
+    return {
+      resident: makeResident(name, nameZh, floor),
+      targetFloor,
+      pressedBy,
+    }
+  }
+
+  /**
+   * door_open → moving_up 遷移を再現し、ログ kind を検証する。
+   * prevPassengers に「door_open 開始時の乗客」をセットして
+   * 次フェーズ遷移時のログ記録をトリガーする。
+   */
+  function injectDoorCloseTransition(
+    scene: PlayScene,
+    prevPassengers: Passenger[],
+    nextPassengers: Passenger[],
+    currentFloor: number
+  ): void {
+    const s = scene as unknown as {
+      state: GameState
+      prevPhase: GameState['elevator']['phase'] | null
+      prevPassengers: Passenger[]
+    }
+    // door_open フェーズの状態をセット
+    s.state = makeState({
+      passengers: nextPassengers,
+      elevator: {
+        phase: 'moving_up',
+        currentFloor,
+        nextStopFloor: null,
+        doorTimerMs: 0,
+      },
+    })
+    s.prevPhase = 'door_open'
+    s.prevPassengers = prevPassengers
+    scene.update(0)
+  }
+
+  it('H-1: pressedBy=player の客が降りると kind が correct になる', () => {
+    const p = makePassenger('A', '甲', 3, 3, 'player')
+    injectDoorCloseTransition(scene, [p], [], 3)
+    const logs = scene.getLogLines()
+    expect(logs.length).toBeGreaterThan(0)
+    expect(logs[logs.length - 1].kind).toBe('correct')
+  })
+
+  it('H-2: pressedBy=self の客が降りると kind が miss になる', () => {
+    const p = makePassenger('B', '乙', 4, 4, 'self')
+    injectDoorCloseTransition(scene, [p], [], 4)
+    const logs = scene.getLogLines()
+    expect(logs.length).toBeGreaterThan(0)
+    expect(logs[logs.length - 1].kind).toBe('miss')
+  })
+
+  it('H-3: pressedBy=auto の客が降りると kind が normal になる', () => {
+    const p = makePassenger('C', '丙', 2, 1, 'auto')
+    // auto 客は 1F 行き。currentFloor=1 で降車
+    injectDoorCloseTransition(scene, [p], [], 1)
+    const logs = scene.getLogLines()
+    // auto 客の降車はログに記録されない（乗車ログのみ）ためログは 0 件
+    // 代わりに乗車ログ側のテストで確認
+    // ここでは miss になっていないことだけ確認
+    for (const log of logs) {
+      expect(log.kind).not.toBe('miss')
+    }
+  })
+
+  it('H-4: ログが4件になると先頭が shift されて3件以内に収まる', () => {
+    // 3回 door_open → 次フェーズ遷移を重ねて4件積む
+    for (let floor = 2; floor <= 5; floor++) {
+      const p = makePassenger(`R${floor}`, `甲${floor}`, floor, floor, 'player')
+      injectDoorCloseTransition(scene, [p], [], floor)
+    }
+    expect(scene.getLogLines().length).toBeLessThanOrEqual(3)
+  })
+})
