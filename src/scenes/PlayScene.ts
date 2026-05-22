@@ -617,16 +617,12 @@ export class PlayScene extends Container {
       // 降りた客: prevPassengers にいて新しい passengers にいない人
       for (const p of this.prevPassengers) {
         if (!newNames.has(p.resident.name)) {
-          // targetFloor が currentFloor の客を prevPassengers から探して pressedBy を確認
-          const alighted = this.prevPassengers.find(
-            pp =>
-              pp.resident.name === p.resident.name &&
-              pp.targetFloor === currentFloor
-          )
+          // p 自身の pressedBy で正解/ミス/通常を判定する
+          // auto の客（上の階から乗ってきた1F行き）は pressedBy='auto' で 'normal' 扱い
           const kind =
-            alighted?.pressedBy === 'player'
+            p.pressedBy === 'player'
               ? 'correct'
-              : alighted?.pressedBy === 'self'
+              : p.pressedBy === 'self'
                 ? 'miss'
                 : 'normal'
           this.addLog(`${currentFloor}F: ${p.resident.nameZh} ↓`, kind)
@@ -642,10 +638,7 @@ export class PlayScene extends Container {
     }
   }
 
-  private addLog(
-    line: string,
-    kind: 'normal' | 'correct' | 'miss' = 'normal'
-  ): void {
+  private addLog(line: string, kind: 'normal' | 'correct' | 'miss'): void {
     this.logLines.push({ text: line, kind })
     if (this.logLines.length > 3) this.logLines.shift()
   }
@@ -841,6 +834,14 @@ export class PlayScene extends Container {
   /** 賢さ（移動中に本を読んだ時間 ms） */
   getScore(): number {
     return this.state.score
+  }
+
+  /** テスト用: ログ行リストを返す */
+  getLogLines(): ReadonlyArray<{
+    text: string
+    kind: 'normal' | 'correct' | 'miss'
+  }> {
+    return this.logLines
   }
 
   attachInputs(
