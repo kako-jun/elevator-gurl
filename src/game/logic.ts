@@ -146,7 +146,9 @@ export function playerPressFloor(
 ): GameState {
   if (state.elevator.phase !== 'input') return state
 
-  // 悪戯ボタン（pressedBy === 'child'）がある場合はキャンセル（除去）
+  // 悪戯ボタン（pressedBy === 'child'）がある場合はキャンセル（除去）して return。
+  // 同じ階に本物の client（pressedBy === null）がいても、このタップではまだ割り当てない。
+  // 「子供の悪戯を解除する」という1アクションを意図的に要求するゲームデザイン。
   const childIdx = state.passengers.findIndex(
     p => p.targetFloor === targetFloor && p.pressedBy === 'child'
   )
