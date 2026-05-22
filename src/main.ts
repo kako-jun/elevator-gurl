@@ -113,8 +113,8 @@ async function bootstrap(): Promise<void> {
   playScene.y = SCENE_TRANSFORMS.play.y
   sceneManager.world.addChild(playScene)
 
-  playScene.setGameOverCallback((score, mistakes) => {
-    resultScene.setResult({ kind: 'gameover', score, mistakes })
+  playScene.setGameOverCallback((money, score, mistakes) => {
+    resultScene.setResult({ kind: 'gameover', money, score, mistakes })
     setActiveScene('result')
     void sceneManager.navigateTo('result', 800)
   })
@@ -167,6 +167,7 @@ async function bootstrap(): Promise<void> {
           // Esc はギブアップ扱いで Result へ遷移する (Issue #11)。
           resultScene.setResult({
             kind: 'gameover',
+            money: playScene.getMoney(),
             score: playScene.getScore(),
           })
           setActiveScene('result')

@@ -118,16 +118,18 @@ export class ResultScene extends Container {
    */
   setResult(opts: {
     kind: ResultKind
+    money?: number
     score?: number
     mistakes?: number
   }): void {
     this.currentKind = opts.kind
     this.headline.text = HEADLINE_TEXT[opts.kind]
-    if (opts.score !== undefined) {
-      const lines = [`SCORE: ${opts.score}`]
-      if (opts.mistakes !== undefined) {
-        lines.push(`ミス: ${opts.mistakes}`)
-      }
+    if (opts.money !== undefined || opts.score !== undefined) {
+      const lines: string[] = []
+      if (opts.money !== undefined) lines.push(`賃金: ¥${opts.money}`)
+      if (opts.score !== undefined)
+        lines.push(`賢さ: ${Math.floor(opts.score / 1000)}`)
+      if (opts.mistakes !== undefined) lines.push(`ミス: ${opts.mistakes}`)
       this.scoreText.text = lines.join('\n')
       this.scoreText.visible = true
     } else {
