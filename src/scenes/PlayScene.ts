@@ -151,9 +151,9 @@ export class PlayScene extends Container {
   /** ビル背景スプライト（public/assets/building-bg.png） */
   private readonly buildingBgSprite: Sprite
   /** チューリン スプライト（idle / reading を切り替え） */
-  private readonly chullinSprite: Sprite
-  private readonly chullinIdleTex: Texture
-  private readonly chullinReadingTex: Texture
+  private readonly turingSprite: Sprite
+  private readonly turingIdleTex: Texture
+  private readonly turingReadingTex: Texture
 
   // ─── ゲームオーバー通知 ───────────────────────────────────────
   private _gameOverFired = false
@@ -193,6 +193,15 @@ export class PlayScene extends Container {
   private readonly phaseText: Text
   private readonly floorIndicatorText: Text
   private readonly passengerCountText: Text
+
+  /** 住民タイプ別・コマ別テクスチャ */
+  private readonly residentTextures: Record<string, [Texture, Texture]>
+  /** 待機客スプライトプール */
+  private waitingSpritePool: Sprite[] = []
+  /** アニメーションフレームカウンタ（ms累積） */
+  private animTimer = 0
+  /** 現在のアニメコマ（0 or 1） */
+  private animFrame = 0
 
   private waitingTextPool: Text[] = []
   private logTextPool: Text[] = []
@@ -249,8 +258,8 @@ export class PlayScene extends Container {
     this.worldContainer.addChild(this.buildingBgGfx)
 
     // ビル背景スプライト（ドット絵上書き用プレースホルダ）
-    this.chullinIdleTex = Texture.from('/assets/chullin-idle.png')
-    this.chullinReadingTex = Texture.from('/assets/chullin-reading.png')
+    this.turingIdleTex = Texture.from('/assets/turing-idle.png')
+    this.turingReadingTex = Texture.from('/assets/turing-reading.png')
     this.buildingBgSprite = new Sprite(Texture.from('/assets/building-bg.png'))
     this.buildingBgSprite.x = 0
     this.buildingBgSprite.y = BUILDING_TOP
@@ -270,10 +279,10 @@ export class PlayScene extends Container {
     this.worldContainer.addChild(this.elevGfx)
 
     // チューリンスプライト（ドット絵上書き用プレースホルダ）
-    this.chullinSprite = new Sprite(this.chullinIdleTex)
-    this.chullinSprite.anchor.set(0.5, 1)
-    this.chullinSprite.alpha = 0.5 // プレースホルダは薄く
-    this.worldContainer.addChild(this.chullinSprite)
+    this.turingSprite = new Sprite(this.turingIdleTex)
+    this.turingSprite.anchor.set(0.5, 1)
+    this.turingSprite.alpha = 0.5 // プレースホルダは薄く
+    this.worldContainer.addChild(this.turingSprite)
 
     // タイマーバー（HUD）→ this に直接
     this.addChild(this.timerGfx)
@@ -310,6 +319,22 @@ export class PlayScene extends Container {
 
     // 各階のボタンを生成（2階〜FLOOR_COUNT階）
     this.buildFloorButtons()
+
+    // 住民スプライト用テクスチャをプリロード
+    this.residentTextures = {
+      normal: [
+        Texture.from('/assets/resident-normal-0.png'),
+        Texture.from('/assets/resident-normal-1.png'),
+      ],
+      elder: [
+        Texture.from('/assets/resident-elder-0.png'),
+        Texture.from('/assets/resident-elder-1.png'),
+      ],
+      child: [
+        Texture.from('/assets/resident-child-0.png'),
+        Texture.from('/assets/resident-child-1.png'),
+      ],
+    }
   }
 
   // ─── 静的描画 ──────────────────────────────────────────────────
@@ -532,6 +557,13 @@ export class PlayScene extends Container {
   // ─── 毎フレーム更新 ────────────────────────────────────────────
 
   update(deltaMS: number): void {
+    // アニメーションタイマー更新
+    this.animTimer += deltaMS
+    if (this.animTimer >= 400) {
+      this.animTimer = 0
+      this.animFrame = 1 - this.animFrame
+    }
+
     this.state = updateElevator(this.state, deltaMS)
 
     // ランダムイベント検知
@@ -677,11 +709,11 @@ export class PlayScene extends Container {
 
     // チューリンスプライト: エレベーター箱の底中央に配置
     const isMoving = elev.phase === 'moving_up' || elev.phase === 'moving_down'
-    this.chullinSprite.texture = isMoving
-      ? this.chullinReadingTex
-      : this.chullinIdleTex
-    this.chullinSprite.x = ex + ELEV_W / 2
-    this.chullinSprite.y = ey + elevH - 2
+    this.turingSprite.texture = isMoving
+      ? this.turingReadingTex
+      : this.turingIdleTex
+    this.turingSprite.x = ex + ELEV_W / 2
+    this.turingSprite.y = ey + elevH - 2
   }
 
   private drawHUD(): void {
@@ -833,6 +865,10 @@ export class PlayScene extends Container {
     for (const t of this.waitingTextPool) {
       t.visible = false
     }
+    // 既存スプライトを非表示に
+    for (const s of this.waitingSpritePool) {
+      s.visible = false
+    }
 
     const queue = this.state.waitingQueue
     if (queue.length === 0) return
@@ -858,6 +894,26 @@ export class PlayScene extends Container {
       const resident = queue[i]
       const y = midY + i * lineH
 
+      // スプライト
+      let s = this.waitingSpritePool[i]
+      if (!s) {
+        s = new Sprite()
+        this.worldContainer.addChild(s)
+        this.waitingSpritePool.push(s)
+      }
+      const resType = resident.type ?? 'normal'
+      const texPair =
+        this.residentTextures[resType] ?? this.residentTextures['normal']
+      s.texture = texPair[this.animFrame]
+      s.width = 12
+      s.height = 18
+      s.anchor.set(0, 0.5)
+      s.x = BTN_X - 18
+      s.y = y
+      s.alpha = 0.7 // プレースホルダは薄く
+      s.visible = true
+
+      // テキスト
       let t = this.waitingTextPool[i]
       if (!t) {
         t = new Text({
@@ -1070,6 +1126,11 @@ export class PlayScene extends Container {
 
     // ボタンを再生成
     this.buildFloorButtons()
+
+    // スプライトプールを非表示にリセット
+    for (const s of this.waitingSpritePool) {
+      s.visible = false
+    }
   }
 
   reset(): void {
@@ -1081,6 +1142,9 @@ export class PlayScene extends Container {
     // テキストプールとログをリセットしてゲームオーバー後の残留表示を防ぐ
     this.logLines.length = 0
     this.boardingOverlayLines = []
+    for (const s of this.waitingSpritePool) {
+      s.visible = false
+    }
     for (const t of this.waitingTextPool) {
       t.visible = false
     }
@@ -1092,6 +1156,8 @@ export class PlayScene extends Container {
     }
     this.prevPhase = null
     this.prevPassengers = []
+    this.animTimer = 0
+    this.animFrame = 0
     this.refreshButtons()
   }
 
