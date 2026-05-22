@@ -157,6 +157,7 @@ async function bootstrap(): Promise<void> {
   app.ticker.add(ticker => {
     retroFilter.tick(ticker.deltaMS)
     sceneManager.update(ticker.deltaMS)
+    resultScene.update(ticker.deltaMS)
     if (isPlayActive) {
       playScene.update(ticker.deltaMS)
     }

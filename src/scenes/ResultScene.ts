@@ -52,6 +52,16 @@ const HEADLINE_OFFSET_Y = -120
 const SCORE_OFFSET_Y = -40
 const BUTTONS_START_Y = 40
 
+const ENDING_SCRIPT = [
+  'チューリンは学費を稼ぎ切った。',
+  '積み上げた本の山は、天井に届きそうだった。',
+  '──旅に出よう。',
+  '港行きの列車の切符を、',
+  'ポケットに忍ばせて。',
+  '',
+  'おわり',
+]
+
 export class ResultScene extends Container {
   private readonly opts: ResultSceneOptions
   private readonly buttons: ButtonAction[] = []
@@ -59,6 +69,9 @@ export class ResultScene extends Container {
   private readonly headline: Text
   private readonly scoreText: Text
   private currentKind: ResultKind = 'gameover'
+  private readonly endingLines: Text[] = []
+  private endingTimer = 0
+  private endingLineIndex = 0
 
   constructor(opts: ResultSceneOptions) {
     super()
@@ -124,6 +137,15 @@ export class ResultScene extends Container {
   }): void {
     this.currentKind = opts.kind
     this.headline.text = HEADLINE_TEXT[opts.kind]
+    for (const t of this.endingLines) t.destroy()
+    this.endingLines.length = 0
+    this.endingTimer = 0
+    this.endingLineIndex = 0
+    if (opts.kind === 'clear') {
+      this.scoreText.y = -180
+    } else {
+      this.scoreText.y = SCORE_OFFSET_Y
+    }
     if (opts.money !== undefined || opts.score !== undefined) {
       const lines: string[] = []
       if (opts.money !== undefined) lines.push(`賃金: ¥${opts.money}`)
@@ -136,6 +158,45 @@ export class ResultScene extends Container {
       this.scoreText.text = ''
       this.scoreText.visible = false
     }
+  }
+
+  update(dt: number): void {
+    if (this.currentKind !== 'clear') return
+    if (this.endingLineIndex >= ENDING_SCRIPT.length) return
+
+    this.endingTimer += dt
+    if (this.endingTimer < 800) return
+    this.endingTimer = 0
+
+    const line = ENDING_SCRIPT[this.endingLineIndex]
+    this.endingLineIndex++
+
+    const t = new Text({
+      text: line,
+      style: {
+        fontFamily: 'Noto Serif SC, serif',
+        fontSize: 15,
+        fill: 0xddccaa,
+        align: 'center',
+        wordWrap: true,
+        wordWrapWidth: 280,
+      },
+    })
+    t.anchor.set(0.5)
+    t.x = 0
+    t.y = -100 + this.endingLines.length * 28
+    t.alpha = 0
+    this.addChild(t)
+    this.endingLines.push(t)
+
+    let elapsed = 0
+    const fade = (): void => {
+      if (t.destroyed || t.alpha >= 1) return
+      elapsed += 16
+      t.alpha = Math.min(elapsed / 400, 1)
+      if (t.alpha < 1) requestAnimationFrame(fade)
+    }
+    requestAnimationFrame(fade)
   }
 
   /**

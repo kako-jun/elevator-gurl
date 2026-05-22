@@ -40,6 +40,12 @@ export const RAIN_OVERLAY: { bg: number; ambient: number } = {
   ambient: 0x1a2a3a,
 }
 
+/** ネオン・看板色 */
+export const NEON_RED = 0xff2244
+export const NEON_YELLOW = 0xffdd00
+export const NEON_CYAN = 0x00eeff
+export const NEON_ORANGE = 0xff8800
+
 /** 時刻ごとのシャフト色（ambient をベースに少し暗くした値） */
 export const SHAFT_PALETTE: Record<TimeOfDay, number> = {
   midnight: 0x0d0d1a,
