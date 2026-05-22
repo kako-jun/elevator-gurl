@@ -21,7 +21,13 @@
 import { Container, Graphics, Text } from 'pixi.js'
 import type { KeyboardCommand, KeyboardManager } from '../input/KeyboardManager'
 import type { TouchManager } from '../input/TouchManager'
-import { UI_PRIMARY, UI_SECONDARY, UI_TEXT_PRIMARY } from '../constants/colors'
+import {
+  UI_PRIMARY,
+  UI_SECONDARY,
+  UI_TEXT_PRIMARY,
+  TIME_PALETTE,
+  SHAFT_PALETTE,
+} from '../constants/colors'
 import {
   FLOOR_COUNT,
   MAX_WAITING,
@@ -35,6 +41,7 @@ import {
   playerPressFloor,
   floorToY,
   INPUT_TIMEOUT_MS,
+  timeOfDay,
 } from '../game/logic'
 
 // ─── レイアウト定数 ────────────────────────────────────────────
@@ -65,9 +72,7 @@ const BTN_RADIUS = 4
 const NAME_X = BTN_X + BTN_W + 6
 
 // ─── カラー ────────────────────────────────────────────────────
-const COLOR_BUILDING_BG = 0x1a1208
 const COLOR_FLOOR_LINE = 0x4a3820
-const COLOR_SHAFT_BG = 0x0d0d1a
 const COLOR_ELEV_BODY = 0xc8a85a
 const COLOR_ELEV_DOOR = 0x8b6914
 const COLOR_HUD_BG = 0x111111
@@ -104,7 +109,8 @@ export class PlayScene extends Container {
 
   // ─── PixiJS オブジェクト ──────────────────────────────────────
   private readonly hudGfx = new Graphics()
-  private readonly buildingGfx = new Graphics()
+  private readonly buildingBgGfx = new Graphics() // 背景矩形（毎フレーム時刻色で再描画）
+  private readonly buildingStaticGfx = new Graphics() // 床ライン・外枠・窓（constructor で1回）
   private readonly elevGfx = new Graphics()
   private readonly btnLayerGfx = new Graphics() // ボタン背景
   private readonly timerGfx = new Graphics() // inputタイマーバー
@@ -160,9 +166,11 @@ export class PlayScene extends Container {
     this.phaseText.y = BUILDING_TOP / 2
     this.addChild(this.phaseText)
 
-    // ビル断面（静的）
-    this.addChild(this.buildingGfx)
-    this.drawBuilding()
+    // ビル断面（背景は毎フレーム更新、静的部分は1回）
+    this.addChild(this.buildingBgGfx)
+    this.addChild(this.buildingStaticGfx)
+    this.drawBuildingStatic()
+    this.drawBuildingBg()
 
     // ボタン層
     this.addChild(this.btnLayerGfx)
@@ -206,9 +214,25 @@ export class PlayScene extends Container {
 
   // ─── 静的描画 ──────────────────────────────────────────────────
 
-  private drawBuilding(): void {
-    const g = this.buildingGfx
+  /** 時刻に応じたビル背景色を返す */
+  private buildingColorForTime(minutes: number): number {
+    const tod = timeOfDay(minutes)
+    return TIME_PALETTE[tod].bg
+  }
+
+  /** シャフト色（時刻に応じて変化） */
+  private shaftColorForTime(minutes: number): number {
+    const tod = timeOfDay(minutes)
+    return SHAFT_PALETTE[tod] ?? SHAFT_PALETTE['night']
+  }
+
+  /** 背景矩形のみ再描画（毎フレーム時刻色で更新） */
+  private drawBuildingBg(): void {
+    const g = this.buildingBgGfx
     g.clear()
+
+    const bgColor = this.buildingColorForTime(this.state.gameTimeMinutes)
+    const shaftColor = this.shaftColorForTime(this.state.gameTimeMinutes)
 
     // ビル本体背景
     g.rect(
@@ -217,11 +241,17 @@ export class PlayScene extends Container {
       BUILDING_RIGHT - SHAFT_W,
       BUILDING_BOTTOM - BUILDING_TOP
     )
-    g.fill(COLOR_BUILDING_BG)
+    g.fill(bgColor)
 
     // シャフト
     g.rect(0, BUILDING_TOP, SHAFT_W, BUILDING_BOTTOM - BUILDING_TOP)
-    g.fill(COLOR_SHAFT_BG)
+    g.fill(shaftColor)
+  }
+
+  /** 床ライン・外枠・窓を描画（constructor で1回のみ） */
+  private drawBuildingStatic(): void {
+    const g = this.buildingStaticGfx
+    g.clear()
 
     // 各階の床ライン
     for (let f = 1; f <= FLOOR_COUNT; f++) {
@@ -365,6 +395,7 @@ export class PlayScene extends Container {
   update(deltaMS: number): void {
     this.state = updateElevator(this.state, deltaMS)
 
+    this.drawBuildingBg() // 時刻変化で背景色が変わるため毎フレーム更新
     this.drawElevator()
     this.drawHUD()
     this.drawTimerBar()

@@ -11,10 +11,49 @@ import {
   finalizeInput,
   updateElevator,
   floorToY,
+  timeOfDay,
   BOARDING_MS,
   DOOR_OPEN_MS,
+  MINUTES_PER_TRIP,
 } from './logic'
 import { FLOOR_COUNT } from './types'
+
+// ─── timeOfDay ───────────────────────────────────────────────
+
+describe('timeOfDay', () => {
+  it.each([
+    [0, 'midnight'],
+    [299, 'midnight'],
+    [300, 'dawn'],
+    [419, 'dawn'],
+    [420, 'morning'],
+    [659, 'morning'],
+    [660, 'noon'],
+    [899, 'noon'],
+    [900, 'evening'],
+    [1139, 'evening'],
+    [1140, 'night'],
+    [1439, 'night'],
+  ])('timeOfDay(%i) === %s', (minutes, expected) => {
+    expect(timeOfDay(minutes)).toBe(expected)
+  })
+})
+
+// ─── boardPassengers 時刻進行 ─────────────────────────────────
+
+describe('boardPassengers 時刻進行', () => {
+  it('gameTimeMinutes が MINUTES_PER_TRIP 分進む', () => {
+    const state = createInitialState() // gameTimeMinutes: 420
+    const next = boardPassengers(state)
+    expect(next.gameTimeMinutes).toBe(420 + MINUTES_PER_TRIP)
+  })
+
+  it('gameTimeMinutes が 1440 でラップアラウンドする', () => {
+    const state = { ...createInitialState(), gameTimeMinutes: 1430 }
+    const next = boardPassengers(state)
+    expect(next.gameTimeMinutes).toBe((1430 + MINUTES_PER_TRIP) % 1440)
+  })
+})
 
 // ─── floorToY ────────────────────────────────────────────────
 

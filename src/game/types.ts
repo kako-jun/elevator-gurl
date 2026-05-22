@@ -12,6 +12,18 @@
  * 5. 1階に戻ったら繰り返す
  */
 
+/** 時刻帯 */
+export type TimeOfDay =
+  | 'midnight'
+  | 'dawn'
+  | 'morning'
+  | 'noon'
+  | 'evening'
+  | 'night'
+
+/** 天気 */
+export type Weather = 'clear' | 'rain'
+
 /** ビルの総階数 */
 export const FLOOR_COUNT = 8
 
@@ -84,6 +96,10 @@ export interface GameState {
   totalTrips: number
   /** ゲームオーバーかどうか */
   isGameOver: boolean
+  /** ゲーム内時刻（分）。0=00:00、420=07:00、720=12:00、1439=23:59 */
+  gameTimeMinutes: number
+  /** 天気 */
+  weather: Weather
 }
 
 /** 住民データベース（固定）— 九龍城ウォールド風の広東人住民 */
