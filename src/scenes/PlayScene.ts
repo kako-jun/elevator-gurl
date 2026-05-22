@@ -18,7 +18,7 @@
  *
  * 階数が多い場合（FLOOR_COUNT > 8）は吹き出しオーバーレイに切り替える（将来対応）。
  */
-import { Container, Graphics, Text } from 'pixi.js'
+import { Container, Graphics, Sprite, Text, Texture } from 'pixi.js'
 import type { KeyboardCommand, KeyboardManager } from '../input/KeyboardManager'
 import type { TouchManager } from '../input/TouchManager'
 import {
@@ -148,6 +148,12 @@ export class PlayScene extends Container {
   private floorH: number
   /** floorCount 変化通知用の前フレーム値 */
   private prevFloorCount: number
+  /** ビル背景スプライト（public/assets/building-bg.png） */
+  private readonly buildingBgSprite: Sprite
+  /** チューリン スプライト（idle / reading を切り替え） */
+  private readonly chullinSprite: Sprite
+  private readonly chullinIdleTex: Texture
+  private readonly chullinReadingTex: Texture
 
   // ─── ゲームオーバー通知 ───────────────────────────────────────
   private _gameOverFired = false
@@ -241,6 +247,18 @@ export class PlayScene extends Container {
 
     // ビル断面（背景は毎フレーム更新、静的部分は1回）→ worldContainer へ
     this.worldContainer.addChild(this.buildingBgGfx)
+
+    // ビル背景スプライト（ドット絵上書き用プレースホルダ）
+    this.chullinIdleTex = Texture.from('/assets/chullin-idle.png')
+    this.chullinReadingTex = Texture.from('/assets/chullin-reading.png')
+    this.buildingBgSprite = new Sprite(Texture.from('/assets/building-bg.png'))
+    this.buildingBgSprite.x = 0
+    this.buildingBgSprite.y = BUILDING_TOP
+    this.buildingBgSprite.width = VIEW_W
+    this.buildingBgSprite.height = BUILDING_BOTTOM - BUILDING_TOP
+    this.buildingBgSprite.alpha = 0.18 // プレースホルダは薄く; 本物ドット絵に差し替えたら 1.0 に
+    this.worldContainer.addChild(this.buildingBgSprite)
+
     this.worldContainer.addChild(this.buildingStaticGfx)
     this.drawBuildingStatic()
     this.drawBuildingBg()
@@ -250,6 +268,12 @@ export class PlayScene extends Container {
 
     // エレベータ（毎フレーム再描画）→ worldContainer へ
     this.worldContainer.addChild(this.elevGfx)
+
+    // チューリンスプライト（ドット絵上書き用プレースホルダ）
+    this.chullinSprite = new Sprite(this.chullinIdleTex)
+    this.chullinSprite.anchor.set(0.5, 1)
+    this.chullinSprite.alpha = 0.5 // プレースホルダは薄く
+    this.worldContainer.addChild(this.chullinSprite)
 
     // タイマーバー（HUD）→ this に直接
     this.addChild(this.timerGfx)
@@ -650,6 +674,14 @@ export class PlayScene extends Container {
     this.passengerCountText.text = count > 0 ? String(count) : ''
     this.passengerCountText.x = ex + ELEV_W / 2
     this.passengerCountText.y = ey + elevH - 6
+
+    // チューリンスプライト: エレベーター箱の底中央に配置
+    const isMoving = elev.phase === 'moving_up' || elev.phase === 'moving_down'
+    this.chullinSprite.texture = isMoving
+      ? this.chullinReadingTex
+      : this.chullinIdleTex
+    this.chullinSprite.x = ex + ELEV_W / 2
+    this.chullinSprite.y = ey + elevH - 2
   }
 
   private drawHUD(): void {
