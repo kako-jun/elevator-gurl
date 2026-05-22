@@ -22,7 +22,13 @@ import { Container, Graphics, Text } from 'pixi.js'
 import type { KeyboardCommand, KeyboardManager } from '../input/KeyboardManager'
 import type { TouchManager } from '../input/TouchManager'
 import { UI_PRIMARY, UI_SECONDARY, UI_TEXT_PRIMARY } from '../constants/colors'
-import { FLOOR_COUNT, type GameState, type Passenger } from '../game/types'
+import {
+  FLOOR_COUNT,
+  MAX_WAITING,
+  type ElevatorPhase,
+  type GameState,
+  type Passenger,
+} from '../game/types'
 import {
   createInitialState,
   updateElevator,
@@ -74,9 +80,23 @@ const COLOR_DOOR_OPEN = 0x3a6a8a // 扉が開いているときの背景
 /** inputフェーズのタイムバー色 */
 const COLOR_TIMER_BAR = 0x44cc88
 const COLOR_TIMER_LOW = 0xcc4444
+/** 待機列テキスト色 */
+const COLOR_WAITING_TEXT = 0xddcc88
+const COLOR_WAITING_MORE = 0x888866
+/** ログテキスト色 */
+const COLOR_LOG_TEXT = 0xaaccff
+/** 乗客数インジケータ色（エレベータ箱の暗色に合わせる） */
+const COLOR_PASSENGER_COUNT = COLOR_HUD_BG
 
 export class PlayScene extends Container {
   private state: GameState
+
+  // ─── フェーズ変化検知 ──────────────────────────────────────────
+  private prevPhase: ElevatorPhase | null = null
+  private prevPassengers: Passenger[] = []
+
+  // ─── 乗降ログ ─────────────────────────────────────────────────
+  private readonly logLines: string[] = []
 
   // ─── PixiJS オブジェクト ──────────────────────────────────────
   private readonly hudGfx = new Graphics()
@@ -84,10 +104,16 @@ export class PlayScene extends Container {
   private readonly elevGfx = new Graphics()
   private readonly btnLayerGfx = new Graphics() // ボタン背景
   private readonly timerGfx = new Graphics() // inputタイマーバー
+  private readonly waitingLayerGfx = new Graphics()
+  private readonly logGfx = new Graphics()
 
   private readonly hudText: Text
   private readonly phaseText: Text
   private readonly floorIndicatorText: Text
+  private readonly passengerCountText: Text
+
+  private waitingTextPool: Text[] = []
+  private logTextPool: Text[] = []
 
   /**
    * 各階のボタン情報（2階〜FLOOR_COUNT階）
@@ -143,6 +169,12 @@ export class PlayScene extends Container {
     // タイマーバー
     this.addChild(this.timerGfx)
 
+    // 待機列レイヤー
+    this.addChild(this.waitingLayerGfx)
+
+    // 乗降ログレイヤー
+    this.addChild(this.logGfx)
+
     // 現在階インジケータ
     this.floorIndicatorText = new Text({
       text: '1F',
@@ -151,6 +183,18 @@ export class PlayScene extends Container {
     this.floorIndicatorText.anchor.set(0.5, 1)
     this.floorIndicatorText.x = SHAFT_W / 2
     this.addChild(this.floorIndicatorText)
+
+    // 乗客数インジケータ（エレベータ箱内に重ねて表示）
+    this.passengerCountText = new Text({
+      text: '',
+      style: {
+        fontFamily: 'monospace',
+        fontSize: 9,
+        fill: COLOR_PASSENGER_COUNT,
+      },
+    })
+    this.passengerCountText.anchor.set(0.5, 0.5)
+    this.addChild(this.passengerCountText)
 
     // 各階のボタンを生成（2階〜FLOOR_COUNT階）
     this.buildFloorButtons()
@@ -321,6 +365,12 @@ export class PlayScene extends Container {
     this.drawHUD()
     this.drawTimerBar()
     this.refreshButtons()
+    this.detectPhaseChange()
+    this.refreshWaitingList()
+    this.refreshLogArea()
+
+    this.prevPhase = this.state.elevator.phase
+    this.prevPassengers = [...this.state.passengers]
   }
 
   private drawElevator(): void {
@@ -367,6 +417,12 @@ export class PlayScene extends Container {
     g.fill(0xf5c888)
     g.rect(gx - 4, gy + 4, 8, ELEV_H * 0.4)
     g.fill(0x2244aa)
+
+    // 乗客数インジケータ
+    const count = this.state.passengers.length
+    this.passengerCountText.text = count > 0 ? String(count) : ''
+    this.passengerCountText.x = ex + ELEV_W / 2
+    this.passengerCountText.y = ey + ELEV_H - 6
   }
 
   private drawHUD(): void {
@@ -405,6 +461,162 @@ export class PlayScene extends Container {
     g.fill(color)
   }
 
+  // ─── フェーズ変化検知・ログ追記 ────────────────────────────────
+
+  private detectPhaseChange(): void {
+    const phase = this.state.elevator.phase
+    if (this.prevPhase === phase) return
+
+    // door_open が終わった直後（afterDoorClose 実行済み）にログを記録する。
+    // 乗降処理は afterDoorClose 内で行われるため、door_open への遷移時ではなく
+    // door_open から次フェーズへの遷移時に prevPassengers と比較する。
+    if (this.prevPhase === 'door_open') {
+      // prevPassengers が door_open 開始時（乗降前）の乗客リスト
+      // this.state.passengers が乗降後の乗客リスト
+      // prevElevatorFloor を使うため、prevPassengers 記録時の階が必要なので
+      // prevPhase が door_open の間は currentFloor は変わらない（移動しない）
+      // → state.elevator.currentFloor は乗降後もその階なので使用可能
+      const currentFloor = Math.round(this.state.elevator.currentFloor)
+
+      const prevNames = new Set(this.prevPassengers.map(p => p.resident.name))
+      const newNames = new Set(this.state.passengers.map(p => p.resident.name))
+
+      // 降りた客: prevPassengers にいて新しい passengers にいない人
+      for (const p of this.prevPassengers) {
+        if (!newNames.has(p.resident.name)) {
+          this.addLog(`${currentFloor}F: ${p.resident.nameZh} ↓`)
+        }
+      }
+
+      // 乗ってきた客: 新しい passengers にいて prevPassengers にいない人
+      for (const p of this.state.passengers) {
+        if (!prevNames.has(p.resident.name) && p.pressedBy === 'auto') {
+          this.addLog(`${currentFloor}F: ${p.resident.nameZh} ↑1F`)
+        }
+      }
+    }
+  }
+
+  private addLog(line: string): void {
+    this.logLines.push(line)
+    if (this.logLines.length > 3) this.logLines.shift()
+  }
+
+  // ─── 待機列UI ─────────────────────────────────────────────────
+
+  private refreshWaitingList(): void {
+    const g = this.waitingLayerGfx
+    g.clear()
+
+    // 既存テキストを非表示に
+    for (const t of this.waitingTextPool) {
+      t.visible = false
+    }
+
+    const queue = this.state.waitingQueue
+    if (queue.length === 0) return
+
+    // 1階のY範囲
+    const floor1Y = floorToY(1, BUILDING_TOP, FLOOR_H)
+    const floor1Bottom = floor1Y + FLOOR_H
+    const midY = floor1Y + FLOOR_H / 2
+
+    // 表示可能な行数（1行 = 約11px）
+    // 1階エリアの下半分（midY 以下）のみを使用し、ボタンや行き先表示との衝突を避ける
+    const lineH = 11
+    const maxVisible = Math.floor((floor1Bottom - midY) / lineH)
+    const displayCount = Math.min(queue.length, MAX_WAITING, maxVisible)
+    const hasMore = queue.length > displayCount
+
+    for (let i = 0; i < displayCount; i++) {
+      const resident = queue[i]
+      const y = midY + i * lineH
+
+      let t = this.waitingTextPool[i]
+      if (!t) {
+        t = new Text({
+          text: '',
+          style: {
+            fontFamily: 'monospace',
+            fontSize: 9,
+            fill: COLOR_WAITING_TEXT,
+          },
+        })
+        t.anchor.set(0, 0.5)
+        this.addChild(t)
+        this.waitingTextPool.push(t)
+      }
+      // テキストプールを通常アイテムとして再利用する際に色を確定させる
+      t.style.fill = COLOR_WAITING_TEXT
+      t.text = resident.nameZh
+      t.x = BTN_X
+      t.y = y
+      t.visible = true
+    }
+
+    if (hasMore) {
+      const moreIdx = displayCount
+      const extra = queue.length - displayCount
+      const y = midY + moreIdx * lineH
+
+      let t = this.waitingTextPool[moreIdx]
+      if (!t) {
+        t = new Text({
+          text: '',
+          style: {
+            fontFamily: 'monospace',
+            fontSize: 9,
+            fill: COLOR_WAITING_MORE,
+          },
+        })
+        t.anchor.set(0, 0.5)
+        this.addChild(t)
+        this.waitingTextPool.push(t)
+      }
+      // テキストプールを「...他N人」として再利用する際に色を確定させる
+      t.style.fill = COLOR_WAITING_MORE
+      t.text = `...他${extra}人`
+      t.x = BTN_X
+      t.y = y
+      t.visible = true
+    }
+  }
+
+  // ─── 乗降ログUI ───────────────────────────────────────────────
+
+  private refreshLogArea(): void {
+    this.logGfx.clear()
+
+    for (const t of this.logTextPool) {
+      t.visible = false
+    }
+
+    if (this.logLines.length === 0) return
+
+    // 1階エリアの右側（NAME_X より右）に縦に表示
+    const floor1Y = floorToY(1, BUILDING_TOP, FLOOR_H)
+    const lineH = 12
+
+    for (let i = 0; i < this.logLines.length; i++) {
+      const y = floor1Y + 6 + i * lineH
+
+      let t = this.logTextPool[i]
+      if (!t) {
+        t = new Text({
+          text: '',
+          style: { fontFamily: 'monospace', fontSize: 9, fill: COLOR_LOG_TEXT },
+        })
+        t.anchor.set(0, 0.5)
+        this.addChild(t)
+        this.logTextPool.push(t)
+      }
+      t.text = this.logLines[i]
+      t.x = NAME_X
+      t.y = y
+      t.visible = true
+    }
+  }
+
   // ─── 入力アタッチ ──────────────────────────────────────────────
 
   attachInputs(
@@ -420,6 +632,16 @@ export class PlayScene extends Container {
 
   reset(): void {
     this.state = createInitialState()
+    // テキストプールとログをリセットしてゲームオーバー後の残留表示を防ぐ
+    this.logLines.length = 0
+    for (const t of this.waitingTextPool) {
+      t.visible = false
+    }
+    for (const t of this.logTextPool) {
+      t.visible = false
+    }
+    this.prevPhase = null
+    this.prevPassengers = []
     this.refreshButtons()
   }
 
