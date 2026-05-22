@@ -501,7 +501,7 @@ export class PlayScene extends Container {
   private updateCamera(): void {
     const floorCount = this.state.floorCount
     const totalH = MIN_FLOOR_H * floorCount
-    if (totalH <= VIEW_H - BUILDING_TOP - 8) {
+    if (totalH <= BUILDING_BOTTOM - BUILDING_TOP) {
       // 全景に収まる場合はスクロールしない
       this.worldContainer.y = 0
       return
