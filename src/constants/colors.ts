@@ -59,5 +59,8 @@ export const SHAFT_PALETTE: Record<TimeOfDay, number> = {
   night: 0x0d0d1a,
 }
 
+/** 電球色（廊下・室内・乗降オーバーレイ・タイトルロゴ）。DESIGN.md §2-1 LAMP_WARM 参照 */
+export const LAMP_WARM = 0xffaa44
+
 /** エンディングテキスト色（古い羊皮紙・蝋燭光） */
 export const COLOR_ENDING_TEXT = 0xddccaa
