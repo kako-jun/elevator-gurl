@@ -223,7 +223,7 @@ export class PlayScene extends Container {
   /** シャフト色（時刻に応じて変化） */
   private shaftColorForTime(minutes: number): number {
     const tod = timeOfDay(minutes)
-    return SHAFT_PALETTE[tod] ?? SHAFT_PALETTE['night']
+    return SHAFT_PALETTE[tod]
   }
 
   /** 背景矩形のみ再描画（毎フレーム時刻色で更新） */

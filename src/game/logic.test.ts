@@ -34,6 +34,7 @@ describe('timeOfDay', () => {
     [1139, 'evening'],
     [1140, 'night'],
     [1439, 'night'],
+    [1440, 'midnight'], // 防御ガード（% 1440 で通常は到達しないが関数単独テスト）
   ])('timeOfDay(%i) === %s', (minutes, expected) => {
     expect(timeOfDay(minutes)).toBe(expected)
   })
@@ -43,9 +44,11 @@ describe('timeOfDay', () => {
 
 describe('boardPassengers 時刻進行', () => {
   it('gameTimeMinutes が MINUTES_PER_TRIP 分進む', () => {
-    const state = createInitialState() // gameTimeMinutes: 420
-    const next = boardPassengers(state)
-    expect(next.gameTimeMinutes).toBe(420 + MINUTES_PER_TRIP)
+    const initial = createInitialState()
+    const next = boardPassengers(initial)
+    expect(next.gameTimeMinutes).toBe(
+      (initial.gameTimeMinutes + MINUTES_PER_TRIP) % 1440
+    )
   })
 
   it('gameTimeMinutes が 1440 でラップアラウンドする', () => {
