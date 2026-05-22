@@ -91,6 +91,10 @@ const COLOR_PASSENGER_COUNT = COLOR_HUD_BG
 export class PlayScene extends Container {
   private state: GameState
 
+  // ─── ゲームオーバー通知 ───────────────────────────────────────
+  private _gameOverFired = false
+  private onGameOver: ((score: number, mistakes: number) => void) | null = null
+
   // ─── フェーズ変化検知 ──────────────────────────────────────────
   private prevPhase: ElevatorPhase | null = null
   private prevPassengers: Passenger[] = []
@@ -371,6 +375,11 @@ export class PlayScene extends Container {
 
     this.prevPhase = this.state.elevator.phase
     this.prevPassengers = [...this.state.passengers]
+
+    if (this.state.isGameOver && !this._gameOverFired) {
+      this._gameOverFired = true
+      this.onGameOver?.(this.state.score, this.state.mistakes)
+    }
   }
 
   private drawElevator(): void {
@@ -619,6 +628,14 @@ export class PlayScene extends Container {
 
   // ─── 入力アタッチ ──────────────────────────────────────────────
 
+  setGameOverCallback(cb: (score: number, mistakes: number) => void): void {
+    this.onGameOver = cb
+  }
+
+  getScore(): number {
+    return this.state.score
+  }
+
   attachInputs(
     keyboard: KeyboardManager,
     _touch: TouchManager,
@@ -632,6 +649,7 @@ export class PlayScene extends Container {
 
   reset(): void {
     this.state = createInitialState()
+    this._gameOverFired = false
     // テキストプールとログをリセットしてゲームオーバー後の残留表示を防ぐ
     this.logLines.length = 0
     for (const t of this.waitingTextPool) {
