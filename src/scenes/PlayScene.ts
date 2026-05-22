@@ -79,6 +79,7 @@ const BTN_RADIUS = 4
 const NAME_X = BTN_X + BTN_W + 6
 
 // ─── カラー ────────────────────────────────────────────────────
+const LAMP_WARM = 0xffaa44
 const COLOR_FLOOR_LINE = 0x4a3820
 const COLOR_ELEV_BODY = 0xc8a85a
 const COLOR_ELEV_DOOR = 0x8b6914
@@ -100,6 +101,9 @@ const COLOR_LOG_TEXT = 0xaaccff
 /** 乗客数インジケータ色（エレベータ箱の暗色に合わせる） */
 const COLOR_PASSENGER_COUNT = COLOR_HUD_BG
 
+/** 乗降オーバーレイボックスの幅（SHAFT_W右端〜NAME_X手前くらいまで） */
+const BOARDING_OVERLAY_W = 110
+
 export class PlayScene extends Container {
   private state: GameState
 
@@ -108,6 +112,11 @@ export class PlayScene extends Container {
   private onGameOver:
     | ((money: number, score: number, mistakes: number) => void)
     | null = null
+
+  // ─── 乗降オーバーレイ ─────────────────────────────────────────
+  private boardingOverlayLines: Array<{ text: string }> = []
+  private readonly boardingOverlayGfx = new Graphics()
+  private boardingOverlayTexts: Text[] = []
 
   // ─── フェーズ変化検知 ──────────────────────────────────────────
   private prevPhase: ElevatorPhase | null = null
@@ -195,6 +204,9 @@ export class PlayScene extends Container {
 
     // 乗降ログレイヤー
     this.addChild(this.logGfx)
+
+    // 乗降オーバーレイレイヤー
+    this.addChild(this.boardingOverlayGfx)
 
     // 現在階インジケータ
     this.floorIndicatorText = new Text({
@@ -412,6 +424,7 @@ export class PlayScene extends Container {
     this.detectPhaseChange()
     this.refreshWaitingList()
     this.refreshLogArea()
+    this.drawBoardingOverlay()
 
     this.prevPhase = this.state.elevator.phase
     this.prevPassengers = [...this.state.passengers]
@@ -522,10 +535,55 @@ export class PlayScene extends Container {
     const phase = this.state.elevator.phase
     if (this.prevPhase === phase) return
 
+    // door_open フェーズへの遷移時にオーバーレイ内容を決定する
+    if (this.prevPhase !== 'door_open' && phase === 'door_open') {
+      const currentFloor = Math.round(this.state.elevator.currentFloor)
+      const passengerNames = new Set(
+        this.state.passengers.map(p => p.resident.name)
+      )
+
+      const lines: Array<{ text: string }> = []
+
+      if (currentFloor === 1) {
+        // 1F boarding フェーズ: waitingQueue から上位3人のみ表示（階数は非表示 = 覚えていないと押せない設計）
+        // passengerNames は1F分岐では参照しない（1F到着時には全員降車済みでpassengersは空のため）
+        const queue = this.state.waitingQueue
+        const showCount = Math.min(queue.length, 3)
+        for (let i = 0; i < showCount; i++) {
+          lines.push({ text: `↑ ${queue[i].nameZh}` })
+        }
+        const remaining = queue.length - showCount
+        if (remaining > 0) {
+          // 「...他N人」フォーマットは refreshWaitingList の待機列表示と共通の文言
+          lines.push({ text: `...他${remaining}人` })
+        }
+      } else {
+        // 上の階: 降りる客 + 乗ってくる客
+        const alighting = this.state.passengers.filter(
+          p => p.targetFloor === currentFloor
+        )
+        for (const p of alighting) {
+          lines.push({ text: `↓ ${p.resident.nameZh}` })
+        }
+
+        const boarding = this.state.residents.filter(
+          r => r.floor === currentFloor && !passengerNames.has(r.name)
+        )
+        for (const r of boarding) {
+          lines.push({ text: `↑ ${r.nameZh} (${r.floor}F)` })
+        }
+      }
+
+      this.boardingOverlayLines = lines
+    }
+
     // door_open が終わった直後（afterDoorClose 実行済み）にログを記録する。
     // 乗降処理は afterDoorClose 内で行われるため、door_open への遷移時ではなく
     // door_open から次フェーズへの遷移時に prevPassengers と比較する。
     if (this.prevPhase === 'door_open') {
+      // オーバーレイをクリア（door_open 終了時）
+      this.boardingOverlayLines = []
+
       // prevPassengers が door_open 開始時（乗降前）の乗客リスト
       // this.state.passengers が乗降後の乗客リスト
       // prevElevatorFloor を使うため、prevPassengers 記録時の階が必要なので
@@ -672,6 +730,52 @@ export class PlayScene extends Container {
     }
   }
 
+  // ─── 乗降オーバーレイUI ────────────────────────────────────────
+
+  private drawBoardingOverlay(): void {
+    const g = this.boardingOverlayGfx
+    g.clear()
+
+    // テキストを非表示に
+    for (const t of this.boardingOverlayTexts) {
+      t.visible = false
+    }
+
+    if (this.state.elevator.phase !== 'door_open') return
+    if (this.boardingOverlayLines.length === 0) return
+
+    const lineH = 16
+    const padding = 6
+    const boxW = BOARDING_OVERLAY_W
+    const boxH = this.boardingOverlayLines.length * lineH + padding * 2
+    const boxX = SHAFT_W + 4
+    const boxY = BUILDING_TOP + 4
+
+    // 半透明の黒背景矩形
+    g.rect(boxX, boxY, boxW, boxH)
+    g.fill({ color: 0x000000, alpha: 0.72 })
+
+    for (let i = 0; i < this.boardingOverlayLines.length; i++) {
+      const { text } = this.boardingOverlayLines[i]
+      const y = boxY + padding + i * lineH + lineH / 2
+
+      let t = this.boardingOverlayTexts[i]
+      if (!t) {
+        t = new Text({
+          text: '',
+          style: { fontFamily: 'monospace', fontSize: 12, fill: LAMP_WARM },
+        })
+        t.anchor.set(0, 0.5)
+        this.addChild(t)
+        this.boardingOverlayTexts.push(t)
+      }
+      t.text = text
+      t.x = boxX + padding
+      t.y = y
+      t.visible = true
+    }
+  }
+
   // ─── 入力アタッチ ──────────────────────────────────────────────
 
   setGameOverCallback(
@@ -706,10 +810,14 @@ export class PlayScene extends Container {
     this._gameOverFired = false
     // テキストプールとログをリセットしてゲームオーバー後の残留表示を防ぐ
     this.logLines.length = 0
+    this.boardingOverlayLines = []
     for (const t of this.waitingTextPool) {
       t.visible = false
     }
     for (const t of this.logTextPool) {
+      t.visible = false
+    }
+    for (const t of this.boardingOverlayTexts) {
       t.visible = false
     }
     this.prevPhase = null
