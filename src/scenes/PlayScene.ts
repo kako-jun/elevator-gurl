@@ -34,6 +34,7 @@ import {
   type ElevatorPhase,
   type GameState,
   type Passenger,
+  type TimeOfDay,
 } from '../game/types'
 import {
   createInitialState,
@@ -41,8 +42,19 @@ import {
   playerPressFloor,
   floorToY,
   INPUT_TIMEOUT_MS,
+  MAX_MISTAKES,
   timeOfDay,
 } from '../game/logic'
+
+/** 時刻帯ラベル */
+const TOD_LABEL: Record<TimeOfDay, string> = {
+  midnight: '[深夜]',
+  dawn: '[夜明]',
+  morning: '[朝]',
+  noon: '[昼]',
+  evening: '[夕]',
+  night: '[夜]',
+}
 
 // ─── レイアウト定数 ────────────────────────────────────────────
 const VIEW_W = 360
@@ -149,12 +161,12 @@ export class PlayScene extends Container {
     this.addChild(this.hudGfx)
 
     this.hudText = new Text({
-      text: '○ 0  × 0',
-      style: { ...baseStyle, fontSize: 13 },
+      text: '[朝] ○ 0  × 0  ¥ 0  ♥♥♥♥♥',
+      style: { ...baseStyle, fontSize: 11 },
     })
     this.hudText.anchor.set(0, 0.5)
     this.hudText.x = 8
-    this.hudText.y = BUILDING_TOP / 2
+    this.hudText.y = 14
     this.addChild(this.hudText)
 
     this.phaseText = new Text({
@@ -163,7 +175,7 @@ export class PlayScene extends Container {
     })
     this.phaseText.anchor.set(1, 0.5)
     this.phaseText.x = VIEW_W - 8
-    this.phaseText.y = BUILDING_TOP / 2
+    this.phaseText.y = 38
     this.addChild(this.phaseText)
 
     // ビル断面（背景は毎フレーム更新、静的部分は1回）
@@ -471,8 +483,16 @@ export class PlayScene extends Container {
     g.rect(0, 0, VIEW_W, BUILDING_TOP)
     g.fill(COLOR_HUD_BG)
 
-    this.hudText.text = `○ ${this.state.score}  × ${this.state.mistakes}`
+    // 上段: 時刻・スコア・ミス・現金・満足度
+    const tod = timeOfDay(this.state.gameTimeMinutes)
+    const todLabel = TOD_LABEL[tod]
+    const fullHearts = MAX_MISTAKES - this.state.mistakes
+    const hearts =
+      '♥'.repeat(Math.max(0, fullHearts)) +
+      '♡'.repeat(Math.max(0, this.state.mistakes))
+    this.hudText.text = `${todLabel} ○ ${this.state.score}  × ${this.state.mistakes}  ¥ ${this.state.money}  ${hearts}`
 
+    // 下段: フェーズ表示
     const phase = this.state.elevator.phase
     const phaseLabel: Record<typeof phase, string> = {
       boarding: '乗車中',
@@ -497,7 +517,7 @@ export class PlayScene extends Container {
     const barW = (VIEW_W - 16) * ratio
     const color = ratio < 0.3 ? COLOR_TIMER_LOW : COLOR_TIMER_BAR
 
-    g.rect(8, BUILDING_TOP - 4, barW, 3)
+    g.rect(8, 28 + 6, barW, 3)
     g.fill(color)
   }
 

@@ -26,6 +26,8 @@ export const BOARDING_MS = 800
 export const INPUT_TIMEOUT_MS = 8000
 /** ゲームオーバーのミス上限 */
 export const MAX_MISTAKES = 5
+/** 1正解あたりの加算金額（円） */
+export const MONEY_PER_CORRECT = 10
 
 /** 1トリップで進むゲーム内時間（分） */
 export const MINUTES_PER_TRIP = 30
@@ -87,6 +89,7 @@ export function createInitialState(): GameState {
     mistakes: 0,
     totalTrips: 0,
     isGameOver: false,
+    money: 0,
     gameTimeMinutes: 420, // 朝7時スタート
     weather: 'clear',
   }
@@ -326,6 +329,7 @@ function afterDoorClose(state: GameState): GameState {
     p => p.targetFloor === currentFloor && p.pressedBy === 'player'
   ).length
   const score = state.score + correctlyDelivered
+  const money = state.money + correctlyDelivered * MONEY_PER_CORRECT
 
   // 次の停止階
   const nextStop = calcNextStop(currentFloor, newPassengers)
@@ -337,6 +341,7 @@ function afterDoorClose(state: GameState): GameState {
     ...state,
     passengers: newPassengers,
     score,
+    money,
     elevator: {
       ...state.elevator,
       phase: nextPhase,
