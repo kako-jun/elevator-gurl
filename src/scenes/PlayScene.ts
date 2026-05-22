@@ -568,6 +568,21 @@ export class PlayScene extends Container {
     g.rect(gx - 4, gy + 4, 8, elevH * 0.4)
     g.fill(0x2244aa)
 
+    // 移動中: 本を読むシルエット（小さい本を手に持つ）
+    if (elev.phase === 'moving_up' || elev.phase === 'moving_down') {
+      // 本（開いた形）
+      const bx = gx + 5
+      const by = gy + 6
+      g.rect(bx, by, 5, 4)
+      g.fill(0xeedd99)
+      g.rect(bx, by, 5, 4)
+      g.stroke({ color: 0x886644, width: 0.5 })
+      // ページの線
+      g.moveTo(bx + 2.5, by)
+      g.lineTo(bx + 2.5, by + 4)
+      g.stroke({ color: 0x886644, width: 0.5 })
+    }
+
     // 乗客数インジケータ
     const count = this.state.passengers.length
     this.passengerCountText.text = count > 0 ? String(count) : ''
@@ -587,7 +602,8 @@ export class PlayScene extends Container {
     const clamped = Math.min(this.state.mistakes, MAX_MISTAKES)
     const hearts = '♥'.repeat(MAX_MISTAKES - clamped) + '♡'.repeat(clamped)
     const remaining = Math.max(0, TUITION_GOAL - this.state.money)
-    this.hudText.text = `${todLabel} ¥${this.state.money}  残¥${remaining}  × ${this.state.mistakes}  ${hearts}`
+    const scoreDisplay = Math.floor(this.state.score / 1000)
+    this.hudText.text = `${todLabel} ¥${this.state.money}  残¥${remaining}  × ${this.state.mistakes}  ${hearts}  📖${scoreDisplay}`
 
     // 下段: フェーズ表示
     const phase = this.state.elevator.phase
