@@ -99,6 +99,7 @@ async function bootstrap(): Promise<void> {
   app.stage.addChild(muteButton)
 
   let activeUnsub: (() => void) | null = null
+  let isPlayActive = false
 
   // --- Title ---
   const titleScene = new TitleScene(() => startPlay(), sound)
@@ -138,6 +139,9 @@ async function bootstrap(): Promise<void> {
   // 1 個の Ticker で全部を回す。
   app.ticker.add(ticker => {
     sceneManager.update(ticker.deltaMS)
+    if (isPlayActive) {
+      playScene.update(ticker.deltaMS)
+    }
   })
 
   // --------------------------------------------------------------------
@@ -147,6 +151,7 @@ async function bootstrap(): Promise<void> {
   function setActiveScene(key: SceneKey): void {
     activeUnsub?.()
     activeUnsub = null
+    isPlayActive = key === 'play'
     switch (key) {
       case 'title':
         activeUnsub = titleScene.attachInputs(keyboard)
@@ -167,6 +172,7 @@ async function bootstrap(): Promise<void> {
   }
 
   function startPlay(): void {
+    playScene.reset()
     setActiveScene('play')
     void sceneManager.navigateTo('play', 800)
   }

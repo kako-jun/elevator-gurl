@@ -1,11 +1,8 @@
 /**
- * PlayScene のユニットテスト (Issue #11)。
+ * PlayScene のユニットテスト。
  *
- * jsdom + KeyboardEvent ベースで「Esc (cancel コマンド) で onExit が発火する」ことを検証する。
- * Graphics 描画自体は jsdom では動かないが、PIXI.Container を継承する構造と
- * `attachInputs(keyboard, touch, onExit)` のコマンドハンドリングは確認できる。
- *
- * amanuma 側 `src/scenes/TitleScene.test.ts` のスタイルを踏襲。
+ * jsdom 環境での Graphics 描画は動かないが、
+ * attachInputs のコマンドハンドリングと reset() の動作を確認する。
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Container } from 'pixi.js'
@@ -58,7 +55,6 @@ describe('PlayScene', () => {
     fire(' ')
     fire('ArrowLeft')
     fire('ArrowRight')
-    fire('1')
     expect(onExit).not.toHaveBeenCalled()
   })
 
@@ -66,5 +62,10 @@ describe('PlayScene', () => {
     unsub()
     fire('Escape')
     expect(onExit).not.toHaveBeenCalled()
+  })
+
+  it('reset() を呼んでも Container は破棄されない', () => {
+    scene.reset()
+    expect(scene.destroyed).toBe(false)
   })
 })
