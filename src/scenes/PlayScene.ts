@@ -89,6 +89,7 @@ const COLOR_BTN_EMPTY = 0x2a1f0e // 未押し
 const COLOR_BTN_PLAYER = UI_PRIMARY // プレイヤーが押した
 const COLOR_BTN_SELF = 0xaa2222 // 客自身が押した（不正解）
 const COLOR_BTN_AUTO = 0x1a4a2a // 上の階から乗ってくる客（1階行き自動）
+const COLOR_BTN_CHILD = 0xcc9922 // 子供の悪戯（黄色系）
 const COLOR_DOOR_OPEN = 0x3a6a8a // 扉が開いているときの背景
 
 /** inputフェーズのタイムバー色 */
@@ -357,7 +358,7 @@ export class PlayScene extends Container {
   private drawFloorBtn(
     gfx: Graphics,
     by: number,
-    state: 'empty' | 'player' | 'self' | 'auto',
+    state: 'empty' | 'player' | 'self' | 'auto' | 'child',
     _passenger: Passenger | null
   ): void {
     gfx.clear()
@@ -368,7 +369,9 @@ export class PlayScene extends Container {
           ? COLOR_BTN_SELF
           : state === 'auto'
             ? COLOR_BTN_AUTO
-            : COLOR_BTN_EMPTY
+            : state === 'child'
+              ? COLOR_BTN_CHILD
+              : COLOR_BTN_EMPTY
 
     gfx.roundRect(BTN_X, by, BTN_W, BTN_H, BTN_RADIUS)
     gfx.fill(color)
@@ -403,19 +406,26 @@ export class PlayScene extends Container {
             ? 'self'
             : passenger?.pressedBy === 'auto'
               ? 'auto'
-              : 'empty'
+              : passenger?.pressedBy === 'child'
+                ? 'child'
+                : 'empty'
 
       this.drawFloorBtn(btn.gfx, by, btnState, passenger)
 
       // 名前表示
       if (passenger && passenger.pressedBy !== null) {
-        btn.nameText.text = passenger.resident.nameZh
-        btn.nameText.style.fill =
-          passenger.pressedBy === 'self'
-            ? COLOR_BTN_SELF
-            : passenger.pressedBy === 'auto'
-              ? 0x88cc88
-              : UI_TEXT_PRIMARY
+        if (passenger.pressedBy === 'child') {
+          btn.nameText.text = `⚡ ${passenger.resident.nameZh}`
+          btn.nameText.style.fill = COLOR_BTN_CHILD
+        } else {
+          btn.nameText.text = passenger.resident.nameZh
+          btn.nameText.style.fill =
+            passenger.pressedBy === 'self'
+              ? COLOR_BTN_SELF
+              : passenger.pressedBy === 'auto'
+                ? 0x88cc88
+                : UI_TEXT_PRIMARY
+        }
       } else {
         btn.nameText.text = ''
       }
@@ -619,10 +629,11 @@ export class PlayScene extends Container {
         if (!newNames.has(p.resident.name)) {
           // p 自身の pressedBy で正解/ミス/通常を判定する
           // auto の客（上の階から乗ってきた1F行き）は pressedBy='auto' で 'normal' 扱い
+          // child の悪戯ボタンで止まった場合は 'miss' 扱い（無駄停止）
           const kind =
             p.pressedBy === 'player'
               ? 'correct'
-              : p.pressedBy === 'self'
+              : p.pressedBy === 'self' || p.pressedBy === 'child'
                 ? 'miss'
                 : 'normal'
           this.addLog(`${currentFloor}F: ${p.resident.nameZh} ↓`, kind)

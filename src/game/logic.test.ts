@@ -4,6 +4,7 @@
  * PixiJS 非依存なので jsdom なしで動く。
  */
 import { describe, expect, it } from 'vitest'
+import { vi } from 'vitest'
 import {
   createInitialState,
   boardPassengers,
@@ -17,8 +18,40 @@ import {
   MINUTES_PER_TRIP,
   WAGE_PER_TRIP,
   TUITION_GOAL,
+  MAX_MISTAKES,
 } from './logic'
 import { FLOOR_COUNT } from './types'
+import type { GameState, Passenger, Resident } from './types'
+
+// ─── テストヘルパー ───────────────────────────────────────────
+
+/** input フェーズに遷移した最小ステートを作る */
+function inputState(): GameState {
+  return boardPassengers(createInitialState())
+}
+
+/** 指定 passengers を持つ input フェーズのステートを作る */
+function stateWithPassengers(passengers: Passenger[]): GameState {
+  return { ...inputState(), passengers }
+}
+
+const RESIDENT_NORMAL: Resident = {
+  name: 'Test Normal',
+  nameZh: '正常',
+  floor: 3,
+}
+const RESIDENT_ELDER: Resident = {
+  name: 'Test Elder',
+  nameZh: '老人',
+  floor: 3,
+  type: 'elder',
+}
+const RESIDENT_CHILD: Resident = {
+  name: 'Test Child',
+  nameZh: '子供',
+  floor: 3,
+  type: 'child',
+}
 
 // ─── timeOfDay ───────────────────────────────────────────────
 
@@ -279,6 +312,228 @@ describe('boardPassengers / isClear 境界値', () => {
     expect(next.money).toBe(TUITION_GOAL + 1)
     expect(next.isClear).toBe(true)
     expect(next.isGameOver).toBe(true)
+  })
+})
+
+// ─── finalizeInput / elder ミスペナルティ ────────────────────
+
+describe('finalizeInput / elder ミスペナルティ', () => {
+  it('elder が pressedBy===null のとき mistakes += 2', () => {
+    const passengers: Passenger[] = [
+      { resident: RESIDENT_ELDER, targetFloor: 3, pressedBy: null },
+    ]
+    const state = stateWithPassengers(passengers)
+    const next = finalizeInput(state)
+    expect(next.mistakes).toBe(state.mistakes + 2)
+  })
+
+  it('normal が pressedBy===null のとき mistakes += 1', () => {
+    const passengers: Passenger[] = [
+      { resident: RESIDENT_NORMAL, targetFloor: 3, pressedBy: null },
+    ]
+    const state = stateWithPassengers(passengers)
+    const next = finalizeInput(state)
+    expect(next.mistakes).toBe(state.mistakes + 1)
+  })
+
+  it('elder + normal 混在: elder×1 + normal×1 で合計 3 増える', () => {
+    const passengers: Passenger[] = [
+      { resident: RESIDENT_ELDER, targetFloor: 3, pressedBy: null },
+      { resident: RESIDENT_NORMAL, targetFloor: 4, pressedBy: null },
+    ]
+    const state = stateWithPassengers(passengers)
+    const next = finalizeInput(state)
+    expect(next.mistakes).toBe(state.mistakes + 3)
+  })
+
+  it('elder が pressedBy==="player" の場合はミスを加算しない', () => {
+    const passengers: Passenger[] = [
+      { resident: RESIDENT_ELDER, targetFloor: 3, pressedBy: 'player' },
+    ]
+    const state = stateWithPassengers(passengers)
+    const next = finalizeInput(state)
+    expect(next.mistakes).toBe(state.mistakes)
+  })
+})
+
+// ─── finalizeInput / MAX_MISTAKES ゲームオーバー ─────────────
+
+describe('finalizeInput / MAX_MISTAKES ゲームオーバー', () => {
+  it('elder ミスで mistakes が MAX_MISTAKES に達すると isGameOver になる', () => {
+    // elder 1人で +2。mistakes = MAX_MISTAKES - 2 からスタートで境界
+    const passengers: Passenger[] = [
+      { resident: RESIDENT_ELDER, targetFloor: 3, pressedBy: null },
+    ]
+    const state = {
+      ...stateWithPassengers(passengers),
+      mistakes: MAX_MISTAKES - 2,
+    }
+    const next = finalizeInput(state)
+    expect(next.mistakes).toBe(MAX_MISTAKES)
+    expect(next.isGameOver).toBe(true)
+  })
+
+  it('normal ミスで mistakes が MAX_MISTAKES に達すると isGameOver になる', () => {
+    const passengers: Passenger[] = [
+      { resident: RESIDENT_NORMAL, targetFloor: 3, pressedBy: null },
+    ]
+    const state = {
+      ...stateWithPassengers(passengers),
+      mistakes: MAX_MISTAKES - 1,
+    }
+    const next = finalizeInput(state)
+    expect(next.mistakes).toBe(MAX_MISTAKES)
+    expect(next.isGameOver).toBe(true)
+  })
+
+  it('elder は mistakes +2 なので normal より早くゲームオーバーになる', () => {
+    // mistakes = MAX_MISTAKES - 2 の場合、
+    // normal は 1 加算でまだゲームオーバーにならないが elder は 2 加算でなる
+    const normalPassengers: Passenger[] = [
+      { resident: RESIDENT_NORMAL, targetFloor: 3, pressedBy: null },
+    ]
+    const elderPassengers: Passenger[] = [
+      { resident: RESIDENT_ELDER, targetFloor: 3, pressedBy: null },
+    ]
+    const base = MAX_MISTAKES - 2
+
+    const normalNext = finalizeInput({
+      ...stateWithPassengers(normalPassengers),
+      mistakes: base,
+    })
+    const elderNext = finalizeInput({
+      ...stateWithPassengers(elderPassengers),
+      mistakes: base,
+    })
+
+    expect(normalNext.isGameOver).toBe(false) // +1 → MAX-1、まだ
+    expect(elderNext.isGameOver).toBe(true) // +2 → MAX、ゲームオーバー
+  })
+})
+
+// ─── finalizeInput / 子供の悪戯 Passenger ─────────────────────
+
+describe('finalizeInput / 子供の悪戯 Passenger', () => {
+  it('child がいて Math.random < 0.5 の場合、空き階に pressedBy===child の Passenger が追加される', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.1) // 常に発動
+    const passengers: Passenger[] = [
+      { resident: RESIDENT_CHILD, targetFloor: 3, pressedBy: 'player' },
+    ]
+    const state = stateWithPassengers(passengers)
+    const next = finalizeInput(state)
+    const childP = next.passengers.filter(p => p.pressedBy === 'child')
+    expect(childP.length).toBeGreaterThan(0)
+    vi.restoreAllMocks()
+  })
+
+  it('child がいても Math.random >= 0.5 の場合、悪戯 Passenger は追加されない', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.9) // 常に不発
+    const passengers: Passenger[] = [
+      { resident: RESIDENT_CHILD, targetFloor: 3, pressedBy: 'player' },
+    ]
+    const state = stateWithPassengers(passengers)
+    const next = finalizeInput(state)
+    const childP = next.passengers.filter(p => p.pressedBy === 'child')
+    expect(childP.length).toBe(0)
+    vi.restoreAllMocks()
+  })
+
+  it('悪戯 Passenger の targetFloor は既存 passengers の targetFloor と重複しない', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.1)
+    // 3階だけ使用中
+    const passengers: Passenger[] = [
+      { resident: RESIDENT_CHILD, targetFloor: 3, pressedBy: 'player' },
+    ]
+    const state = stateWithPassengers(passengers)
+    const next = finalizeInput(state)
+    const childP = next.passengers.find(p => p.pressedBy === 'child')
+    expect(childP).toBeDefined()
+    expect(childP!.targetFloor).not.toBe(3)
+    vi.restoreAllMocks()
+  })
+
+  it('child がいない場合、悪戯 Passenger は追加されない', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.1)
+    const passengers: Passenger[] = [
+      { resident: RESIDENT_NORMAL, targetFloor: 3, pressedBy: null },
+    ]
+    const state = stateWithPassengers(passengers)
+    const next = finalizeInput(state)
+    const childP = next.passengers.filter(p => p.pressedBy === 'child')
+    expect(childP.length).toBe(0)
+    vi.restoreAllMocks()
+  })
+
+  it('全階が埋まっている場合、悪戯 Passenger は追加されない', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.1)
+    // 2〜FLOOR_COUNT をすべて埋める
+    const passengers: Passenger[] = []
+    passengers.push({
+      resident: RESIDENT_CHILD,
+      targetFloor: 2,
+      pressedBy: 'player',
+    })
+    for (let f = 3; f <= FLOOR_COUNT; f++) {
+      passengers.push({
+        resident: RESIDENT_NORMAL,
+        targetFloor: f,
+        pressedBy: 'player',
+      })
+    }
+    const state = stateWithPassengers(passengers)
+    const next = finalizeInput(state)
+    const childP = next.passengers.filter(p => p.pressedBy === 'child')
+    expect(childP.length).toBe(0)
+    vi.restoreAllMocks()
+  })
+})
+
+// ─── playerPressFloor / child キャンセル ─────────────────────
+
+describe('playerPressFloor / child キャンセル', () => {
+  it('child ボタンの階を再タップすると悪戯 Passenger が除去される', () => {
+    const childPassenger: Passenger = {
+      resident: RESIDENT_CHILD,
+      targetFloor: 5,
+      pressedBy: 'child',
+    }
+    const state = stateWithPassengers([childPassenger])
+    const next = playerPressFloor(state, 5)
+    expect(next.passengers.find(p => p.pressedBy === 'child')).toBeUndefined()
+    expect(next.passengers.length).toBe(state.passengers.length - 1)
+  })
+
+  it('child ボタンがない状態で playerPressFloor を呼ぶと通常動作（pressedBy === null を player に）', () => {
+    const normalPassenger: Passenger = {
+      resident: RESIDENT_NORMAL,
+      targetFloor: 4,
+      pressedBy: null,
+    }
+    const state = stateWithPassengers([normalPassenger])
+    const next = playerPressFloor(state, 4)
+    const pressed = next.passengers.find(p => p.targetFloor === 4)
+    expect(pressed?.pressedBy).toBe('player')
+  })
+
+  it('child キャンセル後、同じ階に null の Passenger がいても除去のみで player 扱いにはならない', () => {
+    // child ボタンが先にヒットして除去 → null の Passenger には触れない
+    const childPassenger: Passenger = {
+      resident: RESIDENT_CHILD,
+      targetFloor: 5,
+      pressedBy: 'child',
+    }
+    const normalPassenger: Passenger = {
+      resident: RESIDENT_NORMAL,
+      targetFloor: 5,
+      pressedBy: null,
+    }
+    const state = stateWithPassengers([childPassenger, normalPassenger])
+    const next = playerPressFloor(state, 5)
+    // child は除去される
+    expect(next.passengers.find(p => p.pressedBy === 'child')).toBeUndefined()
+    // null の Passenger は player に変わらず null のまま残る
+    const remaining = next.passengers.find(p => p.targetFloor === 5)
+    expect(remaining?.pressedBy).toBe(null)
   })
 })
 
