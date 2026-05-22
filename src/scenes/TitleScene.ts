@@ -15,11 +15,9 @@ import {
   UI_SECONDARY,
   UI_TEXT_PRIMARY,
   TIME_PALETTE,
+  LAMP_WARM,
 } from '../constants/colors'
 import type { SoundManager } from '../audio/SoundManager'
-
-/** タイトルロゴ「囡」専用の暖色 (PlayScene の LAMP_WARM と同値)。タイトル画面演出専用。 */
-const LOGO_COLOR = 0xffaa44
 
 export type TitleAction = 'start'
 
@@ -68,7 +66,7 @@ export class TitleScene extends Container {
         fontFamily: '"Noto Serif SC", "Source Han Serif SC", serif',
         fontSize: 96,
         fontWeight: '700',
-        fill: LOGO_COLOR,
+        fill: LAMP_WARM,
         align: 'center',
       },
     })

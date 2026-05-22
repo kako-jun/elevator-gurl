@@ -32,6 +32,7 @@ import {
   NEON_YELLOW,
   NEON_CYAN,
   NEON_ORANGE,
+  LAMP_WARM,
 } from '../constants/colors'
 import { TOD_LABEL } from '../constants/labels'
 import {
@@ -84,7 +85,6 @@ const BTN_RADIUS = 4
 const NAME_X = BTN_X + BTN_W + 6
 
 // ─── カラー ────────────────────────────────────────────────────
-const LAMP_WARM = 0xffaa44
 const COLOR_FLOOR_LINE = 0x4a3820
 const COLOR_ELEV_BODY = 0xc8a85a
 const COLOR_ELEV_DOOR = 0x8b6914
