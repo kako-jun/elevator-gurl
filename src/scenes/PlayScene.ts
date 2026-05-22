@@ -928,8 +928,9 @@ export class PlayScene extends Container {
   reset(): void {
     this.state = createInitialState()
     this._gameOverFired = false
-    this.floorH = (BUILDING_BOTTOM - BUILDING_TOP) / this.state.floorCount
     this.prevFloorCount = this.state.floorCount
+    // floorCount が初期値に戻るのでレイアウトを再構築する
+    this.rebuildLayout()
     // テキストプールとログをリセットしてゲームオーバー後の残留表示を防ぐ
     this.logLines.length = 0
     this.boardingOverlayLines = []

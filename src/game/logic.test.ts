@@ -20,7 +20,7 @@ import {
   TUITION_GOAL,
   MAX_MISTAKES,
 } from './logic'
-import { FLOOR_COUNT } from './types'
+import { FLOOR_COUNT, FLOOR_COUNT_MAX } from './types'
 import type { GameState, Passenger, Resident } from './types'
 
 // ─── テストヘルパー ───────────────────────────────────────────
@@ -550,5 +550,79 @@ describe('boardPassengers / ゲームオーバーとクリアの排他性', () =
     expect(next.money).toBe(TUITION_GOAL)
     expect(next.isClear).toBe(false)
     expect(next.isGameOver).toBe(true)
+  })
+})
+
+// ─── floorCount 動的階数 ─────────────────────────────────────
+
+describe('createInitialState / floorCount', () => {
+  it('初期 floorCount は FLOOR_COUNT (=8) である', () => {
+    const state = createInitialState()
+    expect(state.floorCount).toBe(FLOOR_COUNT)
+    expect(state.floorCount).toBe(8)
+  })
+})
+
+describe('boardPassengers / floorCount 増加', () => {
+  /** totalTrips を指定値にして boardPassengers を1回呼ぶヘルパー */
+  function stateAtTrips(totalTrips: number, floorCount: number): GameState {
+    return { ...createInitialState(), totalTrips, floorCount }
+  }
+
+  it('totalTrips 19→20 で floorCount が 1 増える', () => {
+    const state = stateAtTrips(19, FLOOR_COUNT)
+    const next = boardPassengers(state)
+    expect(next.totalTrips).toBe(20)
+    expect(next.floorCount).toBe(FLOOR_COUNT + 1)
+  })
+
+  it('totalTrips 39→40 で floorCount がさらに 1 増える', () => {
+    const state = stateAtTrips(39, FLOOR_COUNT + 1)
+    const next = boardPassengers(state)
+    expect(next.totalTrips).toBe(40)
+    expect(next.floorCount).toBe(FLOOR_COUNT + 2)
+  })
+
+  it('20の倍数でないトリップでは floorCount は変わらない', () => {
+    const state = stateAtTrips(10, FLOOR_COUNT)
+    const next = boardPassengers(state)
+    expect(next.floorCount).toBe(FLOOR_COUNT)
+  })
+
+  it('floorCount が FLOOR_COUNT_MAX のとき、それ以上増えない', () => {
+    const state = stateAtTrips(19, FLOOR_COUNT_MAX)
+    const next = boardPassengers(state)
+    expect(next.totalTrips).toBe(20)
+    expect(next.floorCount).toBe(FLOOR_COUNT_MAX)
+  })
+
+  it('初回 trip 0→1 では floorCount は増えない（totalTrips % 20 !== 0）', () => {
+    const state = createInitialState() // totalTrips=0, floorCount=FLOOR_COUNT
+    const next = boardPassengers(state)
+    expect(next.totalTrips).toBe(1)
+    expect(next.floorCount).toBe(FLOOR_COUNT)
+  })
+})
+
+describe('buildWaitingQueue / floorCount フィルタ（boardPassengers 経由）', () => {
+  it('floorCount=8 のとき 9F 以上の住民は waitingQueue に入らない', () => {
+    // updateElevator(moving_down 到着) → buildWaitingQueue 再呼び出し
+    // ここでは waitingQueue を空にして moving_down 到着をシミュレート
+    const base = createInitialState()
+    const state: GameState = {
+      ...base,
+      floorCount: 8,
+      waitingQueue: [],
+      elevator: {
+        ...base.elevator,
+        phase: 'moving_down',
+        currentFloor: 1.01, // step > diff で到着判定される値
+        doorTimerMs: 0,
+        nextStopFloor: null,
+      },
+    }
+    // deltaMS を大きくして moving_down → boarding 遷移
+    const next = updateElevator(state, 5000)
+    expect(next.waitingQueue.every(r => r.floor <= 8)).toBe(true)
   })
 })
