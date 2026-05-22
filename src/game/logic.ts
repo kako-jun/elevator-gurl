@@ -12,6 +12,7 @@ import {
   type ElevatorState,
   type Passenger,
   type Resident,
+  type TimeOfDay,
 } from './types'
 
 // ─── 定数 ────────────────────────────────────────────────────
@@ -25,6 +26,25 @@ export const BOARDING_MS = 800
 export const INPUT_TIMEOUT_MS = 8000
 /** ゲームオーバーのミス上限 */
 export const MAX_MISTAKES = 5
+
+/** 1トリップで進むゲーム内時間（分） */
+export const MINUTES_PER_TRIP = 30
+
+// ─── 時刻ヘルパ ──────────────────────────────────────────────
+
+/**
+ * ゲーム内時刻（分）から時刻帯を返す
+ * @param minutes 0〜1439
+ */
+export function timeOfDay(minutes: number): TimeOfDay {
+  if (minutes < 300) return 'midnight' // 00:00〜05:00
+  if (minutes < 420) return 'dawn' // 05:00〜07:00
+  if (minutes < 660) return 'morning' // 07:00〜11:00
+  if (minutes < 900) return 'noon' // 11:00〜15:00
+  if (minutes < 1140) return 'evening' // 15:00〜19:00
+  if (minutes < 1440) return 'night' // 19:00〜24:00
+  return 'midnight'
+}
 
 // ─── 座標変換 ────────────────────────────────────────────────
 
@@ -67,6 +87,8 @@ export function createInitialState(): GameState {
     mistakes: 0,
     totalTrips: 0,
     isGameOver: false,
+    gameTimeMinutes: 420, // 朝7時スタート
+    weather: 'clear',
   }
 }
 
@@ -97,6 +119,7 @@ export function boardPassengers(state: GameState): GameState {
       doorTimerMs: INPUT_TIMEOUT_MS,
     },
     totalTrips: state.totalTrips + 1,
+    gameTimeMinutes: (state.gameTimeMinutes + MINUTES_PER_TRIP) % 1440,
   }
 }
 
