@@ -15,6 +15,7 @@ import {
   BOARDING_MS,
   DOOR_OPEN_MS,
   MINUTES_PER_TRIP,
+  WAGE_PER_TRIP,
 } from './logic'
 import { FLOOR_COUNT } from './types'
 
@@ -96,6 +97,10 @@ describe('createInitialState', () => {
     const state = createInitialState()
     expect(state.score).toBe(0)
     expect(state.mistakes).toBe(0)
+  })
+
+  it('money の初期値は 0', () => {
+    expect(createInitialState().money).toBe(0)
   })
 })
 
@@ -222,5 +227,15 @@ describe('updateElevator', () => {
     }
     const next = updateElevator(state, DOOR_OPEN_MS + 1)
     expect(['moving_up', 'moving_down']).toContain(next.elevator.phase)
+  })
+})
+
+// ─── boardPassengers / money（固定給） ────────────────────────
+
+describe('boardPassengers / money', () => {
+  it('boardPassengers で money が WAGE_PER_TRIP 増える', () => {
+    const state = createInitialState()
+    const next = boardPassengers(state)
+    expect(next.money).toBe(state.money + WAGE_PER_TRIP)
   })
 })

@@ -28,6 +28,7 @@ import {
   TIME_PALETTE,
   SHAFT_PALETTE,
 } from '../constants/colors'
+import { TOD_LABEL } from '../constants/labels'
 import {
   FLOOR_COUNT,
   MAX_WAITING,
@@ -41,6 +42,7 @@ import {
   playerPressFloor,
   floorToY,
   INPUT_TIMEOUT_MS,
+  MAX_MISTAKES,
   timeOfDay,
 } from '../game/logic'
 
@@ -56,6 +58,11 @@ const BUILDING_RIGHT = VIEW_W - 8
 const BUILDING_TOP = 48
 /** ビル下端Y */
 const BUILDING_BOTTOM = VIEW_H - 8
+
+/** HUD: 上段テキストY */
+const HUD_TOP_Y = 14
+/** HUD: タイマーバーY（上段と下段の間） */
+const HUD_TIMER_BAR_Y = 34
 /** 1フロアの高さ */
 const FLOOR_H = (BUILDING_BOTTOM - BUILDING_TOP) / FLOOR_COUNT
 
@@ -98,7 +105,9 @@ export class PlayScene extends Container {
 
   // ─── ゲームオーバー通知 ───────────────────────────────────────
   private _gameOverFired = false
-  private onGameOver: ((score: number, mistakes: number) => void) | null = null
+  private onGameOver:
+    | ((money: number, score: number, mistakes: number) => void)
+    | null = null
 
   // ─── フェーズ変化検知 ──────────────────────────────────────────
   private prevPhase: ElevatorPhase | null = null
@@ -149,12 +158,12 @@ export class PlayScene extends Container {
     this.addChild(this.hudGfx)
 
     this.hudText = new Text({
-      text: '○ 0  × 0',
-      style: { ...baseStyle, fontSize: 13 },
+      text: '[朝] ○ 0  × 0  ¥ 0  ♥♥♥♥♥',
+      style: { ...baseStyle, fontSize: 11 },
     })
     this.hudText.anchor.set(0, 0.5)
     this.hudText.x = 8
-    this.hudText.y = BUILDING_TOP / 2
+    this.hudText.y = HUD_TOP_Y
     this.addChild(this.hudText)
 
     this.phaseText = new Text({
@@ -163,7 +172,7 @@ export class PlayScene extends Container {
     })
     this.phaseText.anchor.set(1, 0.5)
     this.phaseText.x = VIEW_W - 8
-    this.phaseText.y = BUILDING_TOP / 2
+    this.phaseText.y = 38
     this.addChild(this.phaseText)
 
     // ビル断面（背景は毎フレーム更新、静的部分は1回）
@@ -409,7 +418,7 @@ export class PlayScene extends Container {
 
     if (this.state.isGameOver && !this._gameOverFired) {
       this._gameOverFired = true
-      this.onGameOver?.(this.state.score, this.state.mistakes)
+      this.onGameOver?.(this.state.money, this.state.score, this.state.mistakes)
     }
   }
 
@@ -471,8 +480,14 @@ export class PlayScene extends Container {
     g.rect(0, 0, VIEW_W, BUILDING_TOP)
     g.fill(COLOR_HUD_BG)
 
-    this.hudText.text = `○ ${this.state.score}  × ${this.state.mistakes}`
+    // 上段: 時刻・スコア・ミス・現金・満足度
+    const tod = timeOfDay(this.state.gameTimeMinutes)
+    const todLabel = TOD_LABEL[tod]
+    const clamped = Math.min(this.state.mistakes, MAX_MISTAKES)
+    const hearts = '♥'.repeat(MAX_MISTAKES - clamped) + '♡'.repeat(clamped)
+    this.hudText.text = `${todLabel} ¥${this.state.money}  × ${this.state.mistakes}  ${hearts}`
 
+    // 下段: フェーズ表示
     const phase = this.state.elevator.phase
     const phaseLabel: Record<typeof phase, string> = {
       boarding: '乗車中',
@@ -497,7 +512,7 @@ export class PlayScene extends Container {
     const barW = (VIEW_W - 16) * ratio
     const color = ratio < 0.3 ? COLOR_TIMER_LOW : COLOR_TIMER_BAR
 
-    g.rect(8, BUILDING_TOP - 4, barW, 3)
+    g.rect(8, HUD_TIMER_BAR_Y, barW, 3)
     g.fill(color)
   }
 
@@ -659,10 +674,18 @@ export class PlayScene extends Container {
 
   // ─── 入力アタッチ ──────────────────────────────────────────────
 
-  setGameOverCallback(cb: (score: number, mistakes: number) => void): void {
+  setGameOverCallback(
+    cb: (money: number, score: number, mistakes: number) => void
+  ): void {
     this.onGameOver = cb
   }
 
+  /** 賃金（受験費用） */
+  getMoney(): number {
+    return this.state.money
+  }
+
+  /** 賢さ（移動中に本を読んだ時間 ms） */
   getScore(): number {
     return this.state.score
   }

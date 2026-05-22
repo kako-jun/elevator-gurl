@@ -26,6 +26,8 @@ export const BOARDING_MS = 800
 export const INPUT_TIMEOUT_MS = 8000
 /** ゲームオーバーのミス上限 */
 export const MAX_MISTAKES = 5
+/** 1トリップ完了ごとの固定給（円）*/
+export const WAGE_PER_TRIP = 50
 
 /** 1トリップで進むゲーム内時間（分） */
 export const MINUTES_PER_TRIP = 30
@@ -87,6 +89,7 @@ export function createInitialState(): GameState {
     mistakes: 0,
     totalTrips: 0,
     isGameOver: false,
+    money: 0,
     gameTimeMinutes: 420, // 朝7時スタート
     weather: 'clear',
   }
@@ -120,6 +123,7 @@ export function boardPassengers(state: GameState): GameState {
     },
     totalTrips: state.totalTrips + 1,
     gameTimeMinutes: (state.gameTimeMinutes + MINUTES_PER_TRIP) % 1440,
+    money: state.money + WAGE_PER_TRIP,
   }
 }
 
@@ -244,6 +248,7 @@ export function updateElevator(state: GameState, deltaMS: number): GameState {
 
     return {
       ...state,
+      score: state.score + deltaMS,
       elevator: { ...elev, currentFloor: elev.currentFloor + step },
     }
   }
@@ -286,6 +291,7 @@ export function updateElevator(state: GameState, deltaMS: number): GameState {
 
     return {
       ...state,
+      score: state.score + deltaMS,
       elevator: { ...elev, currentFloor: elev.currentFloor - step },
     }
   }
@@ -321,12 +327,6 @@ function afterDoorClose(state: GameState): GameState {
 
   const newPassengers = [...remaining, ...boardingFromFloor]
 
-  // スコア加算（プレイヤーが正しく押していた客が降りた分）
-  const correctlyDelivered = state.passengers.filter(
-    p => p.targetFloor === currentFloor && p.pressedBy === 'player'
-  ).length
-  const score = state.score + correctlyDelivered
-
   // 次の停止階
   const nextStop = calcNextStop(currentFloor, newPassengers)
 
@@ -336,7 +336,6 @@ function afterDoorClose(state: GameState): GameState {
   return {
     ...state,
     passengers: newPassengers,
-    score,
     elevator: {
       ...state.elevator,
       phase: nextPhase,
