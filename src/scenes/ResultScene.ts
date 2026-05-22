@@ -7,7 +7,12 @@
  */
 import { Container, Graphics, Text } from 'pixi.js'
 import type { KeyboardCommand, KeyboardManager } from '../input/KeyboardManager'
-import { UI_PRIMARY, UI_SECONDARY, UI_TEXT_PRIMARY } from '../constants/colors'
+import {
+  UI_PRIMARY,
+  UI_SECONDARY,
+  UI_TEXT_PRIMARY,
+  COLOR_ENDING_TEXT,
+} from '../constants/colors'
 import type { SoundManager } from '../audio/SoundManager'
 
 /**
@@ -176,7 +181,7 @@ export class ResultScene extends Container {
       style: {
         fontFamily: 'Noto Serif SC, serif',
         fontSize: 15,
-        fill: 0xddccaa,
+        fill: COLOR_ENDING_TEXT,
         align: 'center',
         wordWrap: true,
         wordWrapWidth: 280,

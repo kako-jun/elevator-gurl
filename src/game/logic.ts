@@ -303,6 +303,8 @@ function calcNextStop(
 
 /** エレベータの状態を deltaMS 分進める */
 export function updateElevator(state: GameState, deltaMS: number): GameState {
+  if (state.isGameOver) return state
+
   const elev = state.elevator
 
   // ── boarding フェーズ（乗り込み演出） ──
@@ -438,7 +440,7 @@ function afterDoorClose(state: GameState): GameState {
   const nextPhase =
     nextStop !== null ? ('moving_up' as const) : ('moving_down' as const)
 
-  const event = tryRandomEvent(RESIDENTS_DB)
+  const event = tryRandomEvent(state.residents)
   const moneyBonus = event ? event.moneyBonus : 0
 
   return {
