@@ -1,6 +1,6 @@
 # elevator-gurl - 開発メモ
 
-PixiJS 8 + TypeScript + Vite のスマホ縦比率 (9:16, 360x640) エレベーターゲーム。
+PixiJS 8 + TypeScript + Vite の縦長 640x960 (2:3) エレベーターゲーム。
 プロジェクト構造は `amanuma` の雛形をベースにしている。
 
 - `src/main.ts`: エントリーポイント。Title / Play / Result の 3 シーンを SceneManager に登録
@@ -12,6 +12,10 @@ PixiJS 8 + TypeScript + Vite のスマホ縦比率 (9:16, 360x640) エレベー�
 - `src/game/logic.ts`: ピュア関数のゲームロジック (PixiJS 非依存)
 
 詳細仕様は notes リポの `notes/dev/elevator-gurl.md` 側で管理する。
+
+## 表示サイズ
+
+canvas は CSS で拡大しない。`src/main.ts` で viewport に収まる 2:3 の実表示サイズを計算し、`renderer.resize()` と `stage.scale` で 640x960 の論理座標をブラウザサイズに合わせる。
 
 ## ゲームフロー概要
 

@@ -1,40 +1,51 @@
 import { Filter, GlProgram } from 'pixi.js'
 
 const vert = `
-in vec2 aPosition;
-out vec2 vUv;
+attribute vec2 aPosition;
+varying vec2 vTextureCoord;
 uniform vec4 uInputSize;
 uniform vec4 uOutputFrame;
 uniform vec4 uOutputTexture;
 
-void main() {
+vec4 filterVertexPosition(void) {
   vec2 position = aPosition * uOutputFrame.zw + uOutputFrame.xy;
-  gl_Position = vec4((position / uOutputTexture.xy) * 2.0 - 1.0, 0.0, 1.0);
-  vUv = aPosition;
+
+  position.x = position.x * (2.0 / uOutputTexture.x) - 1.0;
+  position.y = position.y * (2.0 * uOutputTexture.z / uOutputTexture.y) - uOutputTexture.z;
+
+  return vec4(position, 0.0, 1.0);
+}
+
+vec2 filterTextureCoord(void) {
+  return aPosition * (uOutputFrame.zw * uInputSize.zw);
+}
+
+void main() {
+  gl_Position = filterVertexPosition();
+  vTextureCoord = filterTextureCoord();
 }
 `
 
 const frag = `
-in vec2 vUv;
-out vec4 fragColor;
+varying vec2 vTextureCoord;
 uniform sampler2D uTexture;
 uniform float uTime;
 uniform float uScanlineStrength;
 uniform float uVignetteStrength;
 
 void main() {
-  vec4 color = texture(uTexture, vUv);
+  vec4 color = texture2D(uTexture, vTextureCoord);
 
   // スキャンライン（uTime で微小にちらつかせる）
-  float scanline = sin(vUv.y * 320.0 + uTime * 0.5) * 0.5 + 0.5;
+  float scanline = sin(vTextureCoord.y * 320.0 + uTime * 0.5) * 0.5 + 0.5;
   color.rgb -= (1.0 - scanline) * uScanlineStrength;
 
   // ビネット
-  vec2 uv = vUv * 2.0 - 1.0;
+  vec2 uv = vTextureCoord * 2.0 - 1.0;
   float vignette = 1.0 - dot(uv, uv) * uVignetteStrength;
   color.rgb *= clamp(vignette, 0.0, 1.0);
 
-  fragColor = color;
+  gl_FragColor = color;
 }
 `
 

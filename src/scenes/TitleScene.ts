@@ -56,7 +56,7 @@ export class TitleScene extends Container {
 
     // 背景矩形。
     const bg = new Graphics()
-    bg.rect(-180, -320, 360, 640).fill({ color: TIME_PALETTE.night.bg })
+    bg.rect(-320, -480, 640, 960).fill({ color: TIME_PALETTE.night.bg })
     this.addChild(bg)
 
     // ロゴ (漢字タイトル)。
@@ -159,6 +159,7 @@ export class TitleScene extends Container {
         align: 'center',
       },
     })
+    text.eventMode = 'none'
     text.anchor.set(0.5)
     text.x = cx
     text.y = cy

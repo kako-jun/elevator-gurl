@@ -1,14 +1,14 @@
 /**
  * elevator-gurl エントリーポイント (Issues #10, #11)。
  *
- * - 1 個の `Application` (PixiJS) を初期化。スマホ縦比率 (9:16) で固定。
+ * - 1 個の `Application` (PixiJS) を初期化。縦長 2:3 比率で固定。
  * - 1 個の `KeyboardManager` を window に attach (全シーンで共有)。
  * - `SceneManager` に title / play / result の 3 シーンを登録し、
  *   Title → Play → Result → Title の遷移だけ通すミニマル版。
  *
  * ゲームロジックそのものは未実装。各シーンの中身は後続 Issue で詰める。
  */
-import { Application } from 'pixi.js'
+import { Application, Assets } from 'pixi.js'
 import { RetroFilter } from './filters/RetroFilter'
 import { SceneManager, type SceneKey } from './scenes/SceneManager'
 import { TitleScene } from './scenes/TitleScene'
@@ -21,19 +21,32 @@ import { MuteButton } from './audio/MuteButton'
 import { UI_BG } from './constants/colors'
 import './index.css'
 
-/** スマホ縦比率 (9:16)。 */
-const VIEW_W = 360
-const VIEW_H = 640
+/** 縦長ゲーム共通の論理解像度 (2:3)。 */
+const VIEW_W = 640
+const VIEW_H = 960
+const VIEW_ASPECT = VIEW_W / VIEW_H
 
 /**
  * 誌面 (world) 上の各シーンの絶対座標。
- * 9:16 縦比率に合わせ、シーンも縦に積む (title → play → result を 1 画面分ずつ下へ)。
+ * 2:3 縦比率に合わせ、シーンも縦に積む (title → play → result を 1 画面分ずつ下へ)。
  */
 const SCENE_TRANSFORMS = {
   title: { x: VIEW_W / 2, y: VIEW_H / 2, scale: 1 },
   play: { x: VIEW_W / 2, y: VIEW_H / 2 + VIEW_H, scale: 1 },
   result: { x: VIEW_W / 2, y: VIEW_H / 2 + VIEW_H * 2, scale: 1 },
 } as const
+
+const SPRITE_ASSETS = [
+  '/assets/turing-idle.png',
+  '/assets/turing-reading.png',
+  '/assets/building-bg.png',
+  '/assets/resident-normal-0.png',
+  '/assets/resident-normal-1.png',
+  '/assets/resident-elder-0.png',
+  '/assets/resident-elder-1.png',
+  '/assets/resident-child-0.png',
+  '/assets/resident-child-1.png',
+]
 
 async function bootstrap(): Promise<void> {
   const container = document.getElementById('root')
@@ -51,6 +64,21 @@ async function bootstrap(): Promise<void> {
     autoDensity: true,
   })
   container.appendChild(app.canvas)
+  const resizeCanvas = (): void => {
+    const windowAspect = window.innerWidth / window.innerHeight
+    const displayH =
+      windowAspect > VIEW_ASPECT
+        ? Math.floor(window.innerHeight)
+        : Math.floor(window.innerWidth / VIEW_ASPECT)
+    const displayW = Math.floor(displayH * VIEW_ASPECT)
+    app.renderer.resize(displayW, displayH)
+    app.stage.scale.set(displayW / VIEW_W)
+    app.canvas.style.width = `${displayW}px`
+    app.canvas.style.height = `${displayH}px`
+  }
+  resizeCanvas()
+  window.addEventListener('resize', resizeCanvas)
+  await Assets.load(SPRITE_ASSETS)
 
   // RetroFilter (スキャンライン + ビネット)
   const retroFilter = new RetroFilter()
@@ -111,8 +139,9 @@ async function bootstrap(): Promise<void> {
 
   // --- Play ---
   const playScene = new PlayScene()
-  playScene.x = SCENE_TRANSFORMS.play.x
-  playScene.y = SCENE_TRANSFORMS.play.y
+  playScene.x = SCENE_TRANSFORMS.play.x - VIEW_W / 2
+  playScene.y = SCENE_TRANSFORMS.play.y - VIEW_H / 2
+  playScene.visible = false
   sceneManager.world.addChild(playScene)
 
   playScene.setGameOverCallback((money, score, mistakes) => {
@@ -140,6 +169,7 @@ async function bootstrap(): Promise<void> {
   })
   resultScene.x = SCENE_TRANSFORMS.result.x
   resultScene.y = SCENE_TRANSFORMS.result.y
+  resultScene.visible = false
   sceneManager.world.addChild(resultScene)
 
   // SceneManager に登録。
@@ -168,6 +198,8 @@ async function bootstrap(): Promise<void> {
     activeUnsub?.()
     activeUnsub = null
     isPlayActive = key === 'play'
+    playScene.visible = key === 'play'
+    resultScene.visible = key === 'result'
     switch (key) {
       case 'title':
         activeUnsub = titleScene.attachInputs(keyboard)
