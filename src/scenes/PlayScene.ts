@@ -43,6 +43,7 @@ import {
   floorToY,
   INPUT_TIMEOUT_MS,
   MAX_MISTAKES,
+  TUITION_GOAL,
   timeOfDay,
 } from '../game/logic'
 
@@ -110,6 +111,9 @@ export class PlayScene extends Container {
   // ─── ゲームオーバー通知 ───────────────────────────────────────
   private _gameOverFired = false
   private onGameOver:
+    | ((money: number, score: number, mistakes: number) => void)
+    | null = null
+  private onClear:
     | ((money: number, score: number, mistakes: number) => void)
     | null = null
 
@@ -431,7 +435,15 @@ export class PlayScene extends Container {
 
     if (this.state.isGameOver && !this._gameOverFired) {
       this._gameOverFired = true
-      this.onGameOver?.(this.state.money, this.state.score, this.state.mistakes)
+      if (this.state.isClear) {
+        this.onClear?.(this.state.money, this.state.score, this.state.mistakes)
+      } else {
+        this.onGameOver?.(
+          this.state.money,
+          this.state.score,
+          this.state.mistakes
+        )
+      }
     }
   }
 
@@ -498,7 +510,8 @@ export class PlayScene extends Container {
     const todLabel = TOD_LABEL[tod]
     const clamped = Math.min(this.state.mistakes, MAX_MISTAKES)
     const hearts = '♥'.repeat(MAX_MISTAKES - clamped) + '♡'.repeat(clamped)
-    this.hudText.text = `${todLabel} ¥${this.state.money}  × ${this.state.mistakes}  ${hearts}`
+    const remaining = Math.max(0, TUITION_GOAL - this.state.money)
+    this.hudText.text = `${todLabel} ¥${this.state.money}  残¥${remaining}  ×${this.state.mistakes}  ${hearts}`
 
     // 下段: フェーズ表示
     const phase = this.state.elevator.phase
@@ -782,6 +795,12 @@ export class PlayScene extends Container {
     cb: (money: number, score: number, mistakes: number) => void
   ): void {
     this.onGameOver = cb
+  }
+
+  setClearCallback(
+    cb: (money: number, score: number, mistakes: number) => void
+  ): void {
+    this.onClear = cb
   }
 
   /** 賃金（受験費用） */

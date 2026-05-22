@@ -95,6 +95,7 @@ function makeState(overrides: Partial<GameState>): GameState {
     mistakes: 0,
     totalTrips: 0,
     isGameOver: false,
+    isClear: false,
     money: 0,
     gameTimeMinutes: 420,
     weather: 'clear',
