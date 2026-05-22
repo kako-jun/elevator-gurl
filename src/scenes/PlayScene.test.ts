@@ -10,7 +10,7 @@ import { PlayScene } from './PlayScene'
 import { KeyboardManager } from '../input/KeyboardManager'
 import { TouchManager } from '../input/TouchManager'
 import type { GameState, Resident, Passenger } from '../game/types'
-import { BOARDING_MS, INPUT_TIMEOUT_MS } from '../game/logic'
+import { BOARDING_MS, INPUT_TIMEOUT_MS, TUITION_GOAL } from '../game/logic'
 
 describe('PlayScene', () => {
   let keyboard: KeyboardManager
@@ -95,6 +95,7 @@ function makeState(overrides: Partial<GameState>): GameState {
     mistakes: 0,
     totalTrips: 0,
     isGameOver: false,
+    isClear: false,
     money: 0,
     gameTimeMinutes: 420,
     weather: 'clear',
@@ -468,5 +469,149 @@ describe('PlayScene – boardingOverlayLines (A/B/D/E 群)', () => {
     scene.update(0)
 
     expect(getOverlayLines(scene)).toEqual(linesBefore)
+  })
+})
+
+// ─── PlayScene – クリアコールバック / 二重発火防止 / HUD残額 ──────────────
+
+/** PlayScene の内部状態と _gameOverFired を直接書き換えるヘルパー */
+function injectStateAndFire(
+  scene: PlayScene,
+  state: GameState,
+  gameOverFired = false
+): void {
+  const s = scene as unknown as {
+    state: GameState
+    prevPhase: GameState['elevator']['phase'] | null
+    _gameOverFired: boolean
+  }
+  s.state = state
+  s.prevPhase = state.elevator.phase
+  s._gameOverFired = gameOverFired
+  scene.update(0)
+}
+
+function getHudText(scene: PlayScene): string {
+  return (scene as unknown as { hudText: { text: string } }).hudText.text
+}
+
+describe('PlayScene – クリアコールバック', () => {
+  let scene: PlayScene
+
+  beforeEach(() => {
+    scene = new PlayScene()
+  })
+
+  afterEach(() => {
+    if (!scene.destroyed) scene.destroy()
+  })
+
+  it('F-1: isClear=true で update() するとクリアコールバックが呼ばれる', () => {
+    const onClear = vi.fn()
+    const onGameOver = vi.fn()
+    scene.setGameOverCallback(onGameOver)
+    scene.setClearCallback(onClear)
+
+    const state = makeState({
+      isGameOver: true,
+      isClear: true,
+      money: TUITION_GOAL,
+    })
+    injectStateAndFire(scene, state)
+
+    expect(onClear).toHaveBeenCalledTimes(1)
+    expect(onGameOver).not.toHaveBeenCalled()
+  })
+
+  it('F-2: isClear=false で isGameOver=true のとき gameOver コールバックが呼ばれる', () => {
+    const onClear = vi.fn()
+    const onGameOver = vi.fn()
+    scene.setGameOverCallback(onGameOver)
+    scene.setClearCallback(onClear)
+
+    const state = makeState({ isGameOver: true, isClear: false })
+    injectStateAndFire(scene, state)
+
+    expect(onGameOver).toHaveBeenCalledTimes(1)
+    expect(onClear).not.toHaveBeenCalled()
+  })
+
+  it('F-3: クリアコールバックは2回 update() しても1回しか呼ばれない（二重発火防止）', () => {
+    const onClear = vi.fn()
+    scene.setClearCallback(onClear)
+
+    const state = makeState({
+      isGameOver: true,
+      isClear: true,
+      money: TUITION_GOAL,
+    })
+    // 1回目
+    injectStateAndFire(scene, state)
+    // 2回目（_gameOverFired は既に true になっている）
+    scene.update(0)
+
+    expect(onClear).toHaveBeenCalledTimes(1)
+  })
+
+  it('F-4: クリアコールバックは money / score / mistakes を引数で受け取る', () => {
+    const onClear = vi.fn()
+    scene.setClearCallback(onClear)
+
+    const state = makeState({
+      isGameOver: true,
+      isClear: true,
+      money: TUITION_GOAL + 100,
+      score: 42,
+      mistakes: 3,
+    })
+    injectStateAndFire(scene, state)
+
+    expect(onClear).toHaveBeenCalledWith(TUITION_GOAL + 100, 42, 3)
+  })
+})
+
+describe('PlayScene – HUD 残額表示', () => {
+  let scene: PlayScene
+
+  beforeEach(() => {
+    scene = new PlayScene()
+  })
+
+  afterEach(() => {
+    if (!scene.destroyed) scene.destroy()
+  })
+
+  it('G-1: money=0 のとき HUD に 残¥TUITION_GOAL が表示される', () => {
+    const state = makeState({ money: 0 })
+    injectStateAndFire(scene, state)
+    expect(getHudText(scene)).toContain(`残¥${TUITION_GOAL}`)
+  })
+
+  it('G-2: money=TUITION_GOAL-1 のとき HUD に 残¥1 が表示される', () => {
+    const state = makeState({ money: TUITION_GOAL - 1 })
+    injectStateAndFire(scene, state)
+    expect(getHudText(scene)).toContain('残¥1')
+  })
+
+  it('G-3: money=TUITION_GOAL のとき HUD に 残¥0 が表示される（負にならない）', () => {
+    const state = makeState({
+      money: TUITION_GOAL,
+      isGameOver: true,
+      isClear: true,
+    })
+    injectStateAndFire(scene, state)
+    expect(getHudText(scene)).toContain('残¥0')
+    expect(getHudText(scene)).not.toMatch(/残¥-\d/)
+  })
+
+  it('G-4: money が TUITION_GOAL を超えても残額は 0（負にならない）', () => {
+    const state = makeState({
+      money: TUITION_GOAL + 500,
+      isGameOver: true,
+      isClear: true,
+    })
+    injectStateAndFire(scene, state)
+    expect(getHudText(scene)).toContain('残¥0')
+    expect(getHudText(scene)).not.toMatch(/残¥-\d/)
   })
 })

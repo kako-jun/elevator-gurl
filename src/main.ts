@@ -119,6 +119,12 @@ async function bootstrap(): Promise<void> {
     void sceneManager.navigateTo('result', 800)
   })
 
+  playScene.setClearCallback((money, score, mistakes) => {
+    resultScene.setResult({ kind: 'clear', money, score, mistakes })
+    setActiveScene('result')
+    void sceneManager.navigateTo('result', 800)
+  })
+
   // --- Result --- (常駐。setResult で内容だけ差し替える)
   const resultScene = new ResultScene({
     soundManager: sound,

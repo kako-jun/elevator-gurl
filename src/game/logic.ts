@@ -28,6 +28,8 @@ export const INPUT_TIMEOUT_MS = 8000
 export const MAX_MISTAKES = 5
 /** 1トリップ完了ごとの固定給（円）*/
 export const WAGE_PER_TRIP = 50
+/** クリア目標金額（学費）*/
+export const TUITION_GOAL = 10000
 
 /** 1トリップで進むゲーム内時間（分） */
 export const MINUTES_PER_TRIP = 30
@@ -89,6 +91,7 @@ export function createInitialState(): GameState {
     mistakes: 0,
     totalTrips: 0,
     isGameOver: false,
+    isClear: false,
     money: 0,
     gameTimeMinutes: 420, // 朝7時スタート
     weather: 'clear',
@@ -112,6 +115,10 @@ export function boardPassengers(state: GameState): GameState {
     pressedBy: null, // まだ誰も押していない
   }))
 
+  const newMoney = state.money + WAGE_PER_TRIP
+  // !state.isGameOver: 既にゲームオーバー（ミス超過）の状態でクリア扱いにしない
+  const isClear = newMoney >= TUITION_GOAL && !state.isGameOver
+
   return {
     ...state,
     waitingQueue: remaining,
@@ -123,7 +130,9 @@ export function boardPassengers(state: GameState): GameState {
     },
     totalTrips: state.totalTrips + 1,
     gameTimeMinutes: (state.gameTimeMinutes + MINUTES_PER_TRIP) % 1440,
-    money: state.money + WAGE_PER_TRIP,
+    money: newMoney,
+    isGameOver: isClear ? true : state.isGameOver,
+    isClear,
   }
 }
 

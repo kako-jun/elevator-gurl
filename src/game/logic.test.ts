@@ -16,6 +16,7 @@ import {
   DOOR_OPEN_MS,
   MINUTES_PER_TRIP,
   WAGE_PER_TRIP,
+  TUITION_GOAL,
 } from './logic'
 import { FLOOR_COUNT } from './types'
 
@@ -237,5 +238,62 @@ describe('boardPassengers / money', () => {
     const state = createInitialState()
     const next = boardPassengers(state)
     expect(next.money).toBe(state.money + WAGE_PER_TRIP)
+  })
+})
+
+// ─── createInitialState / isClear ────────────────────────────
+
+describe('createInitialState / isClear', () => {
+  it('初期状態で isClear は false', () => {
+    expect(createInitialState().isClear).toBe(false)
+  })
+})
+
+// ─── boardPassengers / isClear 境界値 ───────────────────────
+
+describe('boardPassengers / isClear 境界値', () => {
+  /** money を指定値にセットした初期状態を作るヘルパー */
+  function stateWithMoney(money: number) {
+    return { ...createInitialState(), money }
+  }
+
+  it('money が TUITION_GOAL - WAGE_PER_TRIP - 1 のとき isClear は false（1手前より手前）', () => {
+    const state = stateWithMoney(TUITION_GOAL - WAGE_PER_TRIP - 1)
+    const next = boardPassengers(state)
+    expect(next.money).toBe(TUITION_GOAL - 1)
+    expect(next.isClear).toBe(false)
+    expect(next.isGameOver).toBe(false)
+  })
+
+  it('money が TUITION_GOAL - WAGE_PER_TRIP のとき boardPassengers で TUITION_GOAL に到達して isClear になる（境界: ちょうど）', () => {
+    const state = stateWithMoney(TUITION_GOAL - WAGE_PER_TRIP)
+    const next = boardPassengers(state)
+    expect(next.money).toBe(TUITION_GOAL)
+    expect(next.isClear).toBe(true)
+    expect(next.isGameOver).toBe(true)
+  })
+
+  it('money が TUITION_GOAL - WAGE_PER_TRIP + 1 のとき boardPassengers で TUITION_GOAL を超えて isClear になる（境界: 超過）', () => {
+    const state = stateWithMoney(TUITION_GOAL - WAGE_PER_TRIP + 1)
+    const next = boardPassengers(state)
+    expect(next.money).toBe(TUITION_GOAL + 1)
+    expect(next.isClear).toBe(true)
+    expect(next.isGameOver).toBe(true)
+  })
+})
+
+// ─── boardPassengers / ゲームオーバーとクリアの排他性 ─────────
+
+describe('boardPassengers / ゲームオーバーとクリアの排他性', () => {
+  it('isGameOver=true の状態で TUITION_GOAL に到達しても isClear は false のまま', () => {
+    const state = {
+      ...createInitialState(),
+      money: TUITION_GOAL - WAGE_PER_TRIP,
+      isGameOver: true,
+    }
+    const next = boardPassengers(state)
+    expect(next.money).toBe(TUITION_GOAL)
+    expect(next.isClear).toBe(false)
+    expect(next.isGameOver).toBe(true)
   })
 })

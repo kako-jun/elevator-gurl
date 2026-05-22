@@ -96,6 +96,8 @@ export interface GameState {
   totalTrips: number
   /** ゲームオーバーかどうか */
   isGameOver: boolean
+  /** クリアかどうか（学費達成） */
+  isClear: boolean
   /** 現在の所持金（円） */
   money: number
   /** ゲーム内時刻（分）。0=00:00、420=07:00、720=12:00、1439=23:59 */
