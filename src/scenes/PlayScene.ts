@@ -30,7 +30,6 @@ import {
 } from '../constants/colors'
 import { TOD_LABEL } from '../constants/labels'
 import {
-  FLOOR_COUNT,
   MAX_WAITING,
   type ElevatorPhase,
   type GameState,
@@ -64,17 +63,14 @@ const BUILDING_BOTTOM = VIEW_H - 8
 const HUD_TOP_Y = 14
 /** HUD: タイマーバーY（上段と下段の間） */
 const HUD_TIMER_BAR_Y = 34
-/** 1フロアの高さ */
-const FLOOR_H = (BUILDING_BOTTOM - BUILDING_TOP) / FLOOR_COUNT
-
 /** エレベータ箱のサイズ */
 const ELEV_W = 28
-const ELEV_H = FLOOR_H * 0.82
+// ELEV_H は floorH から動的に計算するため PlayScene.floorH を参照する
 
 /** 行き先ボタンの領域 */
 const BTN_X = SHAFT_W + 4 // ボタン左端X
 const BTN_W = 72 // ボタン幅
-const BTN_H = FLOOR_H * 0.62 // ボタン高さ
+// BTN_H は floorH から動的に計算するため PlayScene.floorH を参照する
 const BTN_RADIUS = 4
 /** ボタン右端からビル右端までのスペース（乗客名表示エリア） */
 const NAME_X = BTN_X + BTN_W + 6
@@ -112,6 +108,11 @@ const BOARDING_OVERLAY_W = 110
 
 export class PlayScene extends Container {
   private state: GameState
+
+  /** 1フロアの高さ（floorCount 変化時に更新） */
+  private floorH: number
+  /** floorCount 変化通知用の前フレーム値 */
+  private prevFloorCount: number
 
   // ─── ゲームオーバー通知 ───────────────────────────────────────
   private _gameOverFired = false
@@ -159,7 +160,7 @@ export class PlayScene extends Container {
    * 各階のボタン情報（2階〜FLOOR_COUNT階）
    * 1階は「待機列・乗降エリア」なのでボタンなし
    */
-  private readonly floorBtns: Array<{
+  private floorBtns: Array<{
     floor: number
     gfx: Graphics
     labelText: Text // "NF"
@@ -169,6 +170,8 @@ export class PlayScene extends Container {
   constructor() {
     super()
     this.state = createInitialState()
+    this.floorH = (BUILDING_BOTTOM - BUILDING_TOP) / this.state.floorCount
+    this.prevFloorCount = this.state.floorCount
 
     const baseStyle = {
       fontFamily: 'monospace',
@@ -286,9 +289,12 @@ export class PlayScene extends Container {
     const g = this.buildingStaticGfx
     g.clear()
 
+    const floorCount = this.state.floorCount
+    const floorH = this.floorH
+
     // 各階の床ライン
-    for (let f = 1; f <= FLOOR_COUNT; f++) {
-      const y = floorToY(f, BUILDING_TOP, FLOOR_H) + FLOOR_H
+    for (let f = 1; f <= floorCount; f++) {
+      const y = floorToY(f, BUILDING_TOP, floorH, floorCount) + floorH
       g.rect(0, y - 1, BUILDING_RIGHT, 2)
       g.fill(COLOR_FLOOR_LINE)
     }
@@ -298,8 +304,9 @@ export class PlayScene extends Container {
     g.stroke({ color: COLOR_FLOOR_LINE, width: 2 })
 
     // 各階番号ラベルと窓
-    for (let f = 1; f <= FLOOR_COUNT; f++) {
-      const floorMidY = floorToY(f, BUILDING_TOP, FLOOR_H) + FLOOR_H / 2
+    for (let f = 1; f <= floorCount; f++) {
+      const floorMidY =
+        floorToY(f, BUILDING_TOP, floorH, floorCount) + floorH / 2
 
       // 窓（1階は待機エリアなのでなし）
       if (f > 1) {
@@ -316,11 +323,16 @@ export class PlayScene extends Container {
   }
 
   private buildFloorButtons(): void {
-    for (let floor = 2; floor <= FLOOR_COUNT; floor++) {
-      const by = floorToY(floor, BUILDING_TOP, FLOOR_H) + (FLOOR_H - BTN_H) / 2
+    const floorCount = this.state.floorCount
+    const floorH = this.floorH
+    const btnH = floorH * 0.62
+
+    for (let floor = 2; floor <= floorCount; floor++) {
+      const by =
+        floorToY(floor, BUILDING_TOP, floorH, floorCount) + (floorH - btnH) / 2
 
       const gfx = new Graphics()
-      this.drawFloorBtn(gfx, by, 'empty', null)
+      this.drawFloorBtn(gfx, by, btnH, 'empty', null)
       gfx.eventMode = 'static'
       gfx.cursor = 'pointer'
       gfx.on('pointerdown', () => {
@@ -339,7 +351,7 @@ export class PlayScene extends Container {
       })
       labelText.anchor.set(0.5, 0.5)
       labelText.x = BTN_X + BTN_W / 2
-      labelText.y = by + BTN_H / 2
+      labelText.y = by + btnH / 2
       this.addChild(labelText)
 
       const nameText = new Text({
@@ -348,7 +360,7 @@ export class PlayScene extends Container {
       })
       nameText.anchor.set(0, 0.5)
       nameText.x = NAME_X
-      nameText.y = by + BTN_H / 2
+      nameText.y = by + btnH / 2
       this.addChild(nameText)
 
       this.floorBtns.push({ floor, gfx, labelText, nameText })
@@ -358,6 +370,7 @@ export class PlayScene extends Container {
   private drawFloorBtn(
     gfx: Graphics,
     by: number,
+    btnH: number,
     state: 'empty' | 'player' | 'self' | 'auto' | 'child',
     _passenger: Passenger | null
   ): void {
@@ -373,10 +386,10 @@ export class PlayScene extends Container {
               ? COLOR_BTN_CHILD
               : COLOR_BTN_EMPTY
 
-    gfx.roundRect(BTN_X, by, BTN_W, BTN_H, BTN_RADIUS)
+    gfx.roundRect(BTN_X, by, BTN_W, btnH, BTN_RADIUS)
     gfx.fill(color)
     const borderColor = state !== 'empty' ? UI_SECONDARY : COLOR_FLOOR_LINE
-    gfx.roundRect(BTN_X, by, BTN_W, BTN_H, BTN_RADIUS)
+    gfx.roundRect(BTN_X, by, BTN_W, btnH, BTN_RADIUS)
     gfx.stroke({ color: borderColor, width: 1 })
   }
 
@@ -391,9 +404,14 @@ export class PlayScene extends Container {
   // ─── ボタン更新 ────────────────────────────────────────────────
 
   private refreshButtons(): void {
+    const floorH = this.floorH
+    const btnH = floorH * 0.62
+    const floorCount = this.state.floorCount
+
     for (const btn of this.floorBtns) {
       const by =
-        floorToY(btn.floor, BUILDING_TOP, FLOOR_H) + (FLOOR_H - BTN_H) / 2
+        floorToY(btn.floor, BUILDING_TOP, floorH, floorCount) +
+        (floorH - btnH) / 2
 
       // この階に向かっている乗客を探す
       const passenger =
@@ -410,7 +428,7 @@ export class PlayScene extends Container {
                 ? 'child'
                 : 'empty'
 
-      this.drawFloorBtn(btn.gfx, by, btnState, passenger)
+      this.drawFloorBtn(btn.gfx, by, btnH, btnState, passenger)
 
       // 名前表示
       if (passenger && passenger.pressedBy !== null) {
@@ -436,6 +454,13 @@ export class PlayScene extends Container {
 
   update(deltaMS: number): void {
     this.state = updateElevator(this.state, deltaMS)
+
+    // floorCount 変化時にレイアウトを再構築
+    if (this.state.floorCount !== this.prevFloorCount) {
+      this.addLog(`!! 違法建築で ${this.state.floorCount}Fになった！`, 'miss')
+      this.rebuildLayout()
+      this.prevFloorCount = this.state.floorCount
+    }
 
     this.drawBuildingBg() // 時刻変化で背景色が変わるため毎フレーム更新
     this.drawElevator()
@@ -469,30 +494,34 @@ export class PlayScene extends Container {
     g.clear()
 
     const elev = this.state.elevator
-    const elevY = floorToY(elev.currentFloor, BUILDING_TOP, FLOOR_H)
+    const floorH = this.floorH
+    const floorCount = this.state.floorCount
+    const elevH = floorH * 0.82
+    const elevY = floorToY(elev.currentFloor, BUILDING_TOP, floorH, floorCount)
 
     // 扉開放時の背景ハイライト
     if (elev.phase === 'door_open') {
       const floorY = floorToY(
         Math.round(elev.currentFloor),
         BUILDING_TOP,
-        FLOOR_H
+        floorH,
+        floorCount
       )
-      g.rect(0, floorY, BUILDING_RIGHT, FLOOR_H)
+      g.rect(0, floorY, BUILDING_RIGHT, floorH)
       g.fill({ color: COLOR_DOOR_OPEN, alpha: 0.18 })
     }
 
     // エレベータ箱
     const ex = (SHAFT_W - ELEV_W) / 2
-    const ey = elevY + (FLOOR_H - ELEV_H) / 2
-    g.roundRect(ex, ey, ELEV_W, ELEV_H, 3)
+    const ey = elevY + (floorH - elevH) / 2
+    g.roundRect(ex, ey, ELEV_W, elevH, 3)
     g.fill(COLOR_ELEV_BODY)
-    g.roundRect(ex, ey, ELEV_W, ELEV_H, 3)
+    g.roundRect(ex, ey, ELEV_W, elevH, 3)
     g.stroke({ color: COLOR_ELEV_DOOR, width: 1 })
 
     // ドアの縦線
     g.moveTo(ex + ELEV_W / 2, ey)
-    g.lineTo(ex + ELEV_W / 2, ey + ELEV_H)
+    g.lineTo(ex + ELEV_W / 2, ey + elevH)
     g.stroke({ color: COLOR_ELEV_DOOR, width: 1 })
 
     // 現在階インジケータ
@@ -503,17 +532,17 @@ export class PlayScene extends Container {
 
     // チューリン（エレベータガール）の人影
     const gx = ex + ELEV_W / 2
-    const gy = ey + ELEV_H * 0.2
+    const gy = ey + elevH * 0.2
     g.circle(gx, gy, 4)
     g.fill(0xf5c888)
-    g.rect(gx - 4, gy + 4, 8, ELEV_H * 0.4)
+    g.rect(gx - 4, gy + 4, 8, elevH * 0.4)
     g.fill(0x2244aa)
 
     // 乗客数インジケータ
     const count = this.state.passengers.length
     this.passengerCountText.text = count > 0 ? String(count) : ''
     this.passengerCountText.x = ex + ELEV_W / 2
-    this.passengerCountText.y = ey + ELEV_H - 6
+    this.passengerCountText.y = ey + elevH - 6
   }
 
   private drawHUD(): void {
@@ -669,9 +698,14 @@ export class PlayScene extends Container {
     if (queue.length === 0) return
 
     // 1階のY範囲
-    const floor1Y = floorToY(1, BUILDING_TOP, FLOOR_H)
-    const floor1Bottom = floor1Y + FLOOR_H
-    const midY = floor1Y + FLOOR_H / 2
+    const floor1Y = floorToY(
+      1,
+      BUILDING_TOP,
+      this.floorH,
+      this.state.floorCount
+    )
+    const floor1Bottom = floor1Y + this.floorH
+    const midY = floor1Y + this.floorH / 2
 
     // 表示可能な行数（1行 = 約11px）
     // 1階エリアの下半分（midY 以下）のみを使用し、ボタンや行き先表示との衝突を避ける
@@ -746,7 +780,12 @@ export class PlayScene extends Container {
     if (this.logLines.length === 0) return
 
     // 1階エリアの右側（NAME_X より右）に縦に表示
-    const floor1Y = floorToY(1, BUILDING_TOP, FLOOR_H)
+    const floor1Y = floorToY(
+      1,
+      BUILDING_TOP,
+      this.floorH,
+      this.state.floorCount
+    )
     const lineH = 12
 
     for (let i = 0; i < this.logLines.length; i++) {
@@ -866,9 +905,31 @@ export class PlayScene extends Container {
     return keyboard.onCommand(handler)
   }
 
+  /** floorCount 変化時にレイアウトを再構築する */
+  private rebuildLayout(): void {
+    this.floorH = (BUILDING_BOTTOM - BUILDING_TOP) / this.state.floorCount
+
+    // 既存の floorBtns を破棄
+    for (const btn of this.floorBtns) {
+      btn.gfx.destroy()
+      btn.labelText.destroy()
+      btn.nameText.destroy()
+    }
+    this.floorBtns.splice(0)
+
+    // 建物静的グラフィックを再描画
+    this.buildingStaticGfx.clear()
+    this.drawBuildingStatic()
+
+    // ボタンを再生成
+    this.buildFloorButtons()
+  }
+
   reset(): void {
     this.state = createInitialState()
     this._gameOverFired = false
+    this.floorH = (BUILDING_BOTTOM - BUILDING_TOP) / this.state.floorCount
+    this.prevFloorCount = this.state.floorCount
     // テキストプールとログをリセットしてゲームオーバー後の残留表示を防ぐ
     this.logLines.length = 0
     this.boardingOverlayLines = []

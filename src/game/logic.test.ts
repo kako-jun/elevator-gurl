@@ -99,13 +99,13 @@ describe('floorToY', () => {
   it('1階は建物下端になる', () => {
     const top = 48
     const fh = 10
-    expect(floorToY(1, top, fh)).toBe(top + (FLOOR_COUNT - 1) * fh)
+    expect(floorToY(1, top, fh, FLOOR_COUNT)).toBe(top + (FLOOR_COUNT - 1) * fh)
   })
 
   it('最上階は建物上端になる', () => {
     const top = 48
     const fh = 10
-    expect(floorToY(FLOOR_COUNT, top, fh)).toBe(top)
+    expect(floorToY(FLOOR_COUNT, top, fh, FLOOR_COUNT)).toBe(top)
   })
 })
 

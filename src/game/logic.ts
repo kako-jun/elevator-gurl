@@ -6,6 +6,7 @@
 
 import {
   FLOOR_COUNT,
+  FLOOR_COUNT_MAX,
   MAX_WAITING,
   RESIDENTS_DB,
   type GameState,
@@ -52,13 +53,14 @@ export function timeOfDay(minutes: number): TimeOfDay {
 
 // ─── 座標変換 ────────────────────────────────────────────────
 
-/** 階をY座標に変換（1階が下、FLOOR_COUNT階が上） */
+/** 階をY座標に変換（1階が下、floorCount階が上） */
 export function floorToY(
   floor: number,
   buildingTop: number,
-  floorHeight: number
+  floorHeight: number,
+  floorCount: number
 ): number {
-  return buildingTop + (FLOOR_COUNT - floor) * floorHeight
+  return buildingTop + (floorCount - floor) * floorHeight
 }
 
 // ─── 初期化 ──────────────────────────────────────────────────
@@ -72,15 +74,20 @@ function createIdleElevator(): ElevatorState {
   }
 }
 
-/** 住民リストをシャッフルして待機キューを作る */
-function buildWaitingQueue(residents: Resident[]): Resident[] {
-  return [...residents].sort(() => Math.random() - 0.5)
+/** 住民リストをシャッフルして待機キューを作る（現在の floorCount 以下の階の住民のみ） */
+function buildWaitingQueue(
+  residents: Resident[],
+  floorCount: number
+): Resident[] {
+  return [...residents]
+    .filter(r => r.floor <= floorCount)
+    .sort(() => Math.random() - 0.5)
 }
 
 /** 初期ゲーム状態を生成 */
 export function createInitialState(): GameState {
   const residents = [...RESIDENTS_DB].sort(() => Math.random() - 0.5)
-  const waitingQueue = buildWaitingQueue(residents)
+  const waitingQueue = buildWaitingQueue(residents, FLOOR_COUNT)
 
   return {
     residents,
@@ -95,6 +102,7 @@ export function createInitialState(): GameState {
     money: 0,
     gameTimeMinutes: 420, // 朝7時スタート
     weather: 'clear',
+    floorCount: FLOOR_COUNT,
   }
 }
 
@@ -119,6 +127,13 @@ export function boardPassengers(state: GameState): GameState {
   // !state.isGameOver: 既にゲームオーバー（ミス超過）の状態でクリア扱いにしない
   const isClear = newMoney >= TUITION_GOAL && !state.isGameOver
 
+  const newTotalTrips = state.totalTrips + 1
+  // 20トリップごとに1階増加（上限 FLOOR_COUNT_MAX）
+  const newFloorCount = Math.min(
+    state.floorCount + (newTotalTrips % 20 === 0 && newTotalTrips > 0 ? 1 : 0),
+    FLOOR_COUNT_MAX
+  )
+
   return {
     ...state,
     waitingQueue: remaining,
@@ -128,11 +143,12 @@ export function boardPassengers(state: GameState): GameState {
       phase: 'input',
       doorTimerMs: INPUT_TIMEOUT_MS,
     },
-    totalTrips: state.totalTrips + 1,
+    totalTrips: newTotalTrips,
     gameTimeMinutes: (state.gameTimeMinutes + MINUTES_PER_TRIP) % 1440,
     money: newMoney,
     isGameOver: isClear ? true : state.isGameOver,
     isClear,
+    floorCount: newFloorCount,
   }
 }
 
@@ -193,7 +209,7 @@ export function finalizeInput(state: GameState): GameState {
   if (childPassenger && Math.random() < 0.5) {
     const occupiedFloors = new Set(passengers.map(p => p.targetFloor))
     const freeFloors: number[] = []
-    for (let f = 2; f <= FLOOR_COUNT; f++) {
+    for (let f = 2; f <= state.floorCount; f++) {
       if (!occupiedFloors.has(f)) freeFloors.push(f)
     }
     if (freeFloors.length > 0) {
@@ -315,7 +331,7 @@ export function updateElevator(state: GameState, deltaMS: number): GameState {
       // 待機キューが空なら補充
       const nextQueue =
         state.waitingQueue.length === 0
-          ? buildWaitingQueue(state.residents)
+          ? buildWaitingQueue(state.residents, state.floorCount)
           : state.waitingQueue
 
       return {
