@@ -24,8 +24,11 @@ export type TimeOfDay =
 /** 天気 */
 export type Weather = 'clear' | 'rain'
 
-/** ビルの総階数 */
+/** ビルの総階数（初期値・後方互換用） */
 export const FLOOR_COUNT = 8
+
+/** ビルの総階数の上限（違法建築で増加する最大値） */
+export const FLOOR_COUNT_MAX = 12
 
 /** 1階の待機客の上限 */
 export const MAX_WAITING = 10
@@ -110,6 +113,8 @@ export interface GameState {
   gameTimeMinutes: number
   /** 天気 */
   weather: Weather
+  /** 現在のビル階数（違法建築で増加、初期値 = FLOOR_COUNT） */
+  floorCount: number
 }
 
 /** 住民データベース（固定）— 九龍城ウォールド風の広東人住民 */
@@ -134,4 +139,12 @@ export const RESIDENTS_DB: Resident[] = [
   { name: 'Ma Wai-Ying', nameZh: '馬惠英', floor: 5 },
   { name: 'Fung Kin-Man', nameZh: '馮建民', floor: 4 },
   { name: 'Sin Mei-Kwan', nameZh: '冼美君', floor: 6, type: 'child' },
+  { name: 'Au Yeung Bik', nameZh: '歐陽碧', floor: 9 },
+  { name: 'Cheung Siu-Lung', nameZh: '張小龍', floor: 9 },
+  { name: 'Ip Man-Ting', nameZh: '葉文婷', floor: 10 },
+  { name: 'Lo Ka-Wai', nameZh: '盧家偉', floor: 10 },
+  { name: 'Sham Wai-Fun', nameZh: '岑慧芬', floor: 11 },
+  { name: 'Kwan Siu-Kei', nameZh: '關小琪', floor: 11 },
+  { name: 'Leung Bik-Ha', nameZh: '梁碧霞', floor: 12 },
+  { name: 'Chan Kwok-Leung', nameZh: '陳國良', floor: 12 },
 ]

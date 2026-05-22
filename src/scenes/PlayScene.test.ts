@@ -99,6 +99,7 @@ function makeState(overrides: Partial<GameState>): GameState {
     money: 0,
     gameTimeMinutes: 420,
     weather: 'clear',
+    floorCount: 8,
   }
   return { ...base, ...overrides }
 }
